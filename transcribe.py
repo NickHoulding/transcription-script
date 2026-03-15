@@ -12,11 +12,14 @@ import pandas as pd
 import whisperx
 from whisperx.asr import FasterWhisperPipeline, TranscriptionResult
 from whisperx.diarize import DiarizationPipeline
+from dotenv import load_dotenv
+
+load_dotenv()
 
 COMPUTE_TYPE: str = "float16"
 DEVICE: str = "cuda"
 BATCH_SIZE: int = 16
-HF_TOKEN: str = ""
+HF_TOKEN: str = os.getenv("HF_TOKEN") or ""
 DEFAULT_TRANSCRIPTION_MODEL: str = "medium.en"
 TRANSCRIPTION_MODELS: list[str] = [
     "tiny.en",
