@@ -10,7 +10,8 @@ logging.getLogger("whisperx").setLevel(logging.ERROR)
 logging.getLogger("whisperx.vads.pyannote").setLevel(logging.ERROR)
 logging.getLogger("whisperx.diarize").setLevel(logging.ERROR)
 logging.getLogger("pyannote").setLevel(logging.ERROR)
-logging.getLogger("lighning.pytorch").setLevel(logging.ERROR)
+logging.getLogger("lightning.pytorch").setLevel(logging.ERROR)
+logging.getLogger("lightning.pytorch.utilities.migration.utils").setLevel(logging.ERROR)
 
 warnings.filterwarnings("ignore", module="whisperx")
 warnings.filterwarnings("ignore", module="pyannote")
@@ -150,10 +151,10 @@ def select_transcription_model() -> str:
     try:
         message: str = f"Select a model [1-{len(TRANSCRIPTION_MODELS)}]:"
         model_index: int = get_int_input(message=message)
-        
+
         if model_index < 1 or model_index > len(TRANSCRIPTION_MODELS):
             raise IndexError(f"Choice {model_index} is out of range.")
-        
+
         model = TRANSCRIPTION_MODELS[model_index - 1]
     except (ValueError, IndexError) as e:
         print(
