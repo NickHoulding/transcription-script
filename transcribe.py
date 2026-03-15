@@ -1,7 +1,18 @@
 """"""
 
+import logging
 import warnings
 
+# Suppress logging output
+logging.getLogger("whisperx").setLevel(logging.ERROR)
+logging.getLogger("whisperx.vads.pyannote").setLevel(logging.ERROR)
+logging.getLogger("whisperx.diarize").setLevel(logging.ERROR)
+logging.getLogger("pyannote").setLevel(logging.ERROR)
+logging.getLogger("lighning.pytorch").setLevel(logging.ERROR)
+
+# Suppress warnings
+warnings.filterwarnings("ignore", module="whisperx")
+warnings.filterwarnings("ignore", module="pyannote")
 warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
 
 import os
@@ -10,9 +21,9 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 import whisperx
+from dotenv import load_dotenv
 from whisperx.asr import FasterWhisperPipeline, TranscriptionResult
 from whisperx.diarize import DiarizationPipeline
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -34,14 +45,14 @@ TRANSCRIPTION_MODELS: list[str] = [
 
 def get_str_input(message: str = "") -> str:
     """"""
-    input_val = input(f"{message}:\n>>> ")
+    input_val = input(f"{message}\n>>> ")
     print()
     return input_val
 
 
 def get_int_input(message: str = "") -> int:
     """"""
-    input_val = input(f"{message}:\n>>> ")
+    input_val = input(f"{message}\n>>> ")
     print()
     return int(input_val)
 
@@ -64,11 +75,12 @@ def select_transcription_model() -> str:
     model: str = DEFAULT_TRANSCRIPTION_MODEL
 
     try:
-        model_index: int = get_int_input(message="Select a model")
+        message: str = f"Select a model [1-{len(TRANSCRIPTION_MODELS)}]:"
+        model_index: int = get_int_input(message=message)
         model = TRANSCRIPTION_MODELS[model_index - 1]
     except (ValueError, IndexError) as e:
         print(
-            f"Invalid transcription model choice. Defaulting to {DEFAULT_TRANSCRIPTION_MODEL}"
+            f"Invalid model choice. Defaulting to transcription model '{DEFAULT_TRANSCRIPTION_MODEL}'."
         )
 
     return model
@@ -77,7 +89,7 @@ def select_transcription_model() -> str:
 def main() -> None:
     """"""
     try:
-        num_speakers_input: str = get_str_input(message="How many speakers?")
+        num_speakers_input: str = get_str_input(message="How many speakers are there?")
 
         if not num_speakers_input.isdigit():
             raise ValueError(
@@ -86,7 +98,7 @@ def main() -> None:
 
         num_speakers: int = int(num_speakers_input)
 
-        file_path_input: str = get_str_input(message="Enter file path")
+        file_path_input: str = get_str_input(message="Enter file path:")
 
         if not validate_file_path(file_path_input):
             raise ValueError(f"Invalid file path: {file_path_input}")
@@ -100,26 +112,26 @@ def main() -> None:
             selected_model, device=DEVICE, compute_type=COMPUTE_TYPE
         )
 
-        print("[OK] Transcription model successfully loaded")
+        print("[OK] Transcription model successfully loaded.")
 
         audio: np.ndarray = whisperx.load_audio(file_path)
 
-        print("[OK] Audio successfully loaded")
+        print("[OK] Audio successfully loaded.")
         print("[*] Transcribing...")
 
         transcription: TranscriptionResult = transcription_model.transcribe(
             audio, batch_size=BATCH_SIZE
         )
 
-        print("[OK] Transcription complete")
+        print("[OK] Transcription complete.")
         print("[*] Loading alignment model...")
 
         align_model, metadata = whisperx.load_align_model(
             language_code=transcription["language"], device=DEVICE
         )
 
-        print("[OK] Alignment model loaded")
-        print("[*] Aligning...")
+        print("[OK] Alignment model loaded.")
+        print("[*] Aligning audio segments...")
 
         aligned_transcription: dict[str, Any] = whisperx.align(
             transcription["segments"],
@@ -129,28 +141,35 @@ def main() -> None:
             DEVICE,
         )
 
-        print("[OK] Transcription and audio alignment complete")
+        print("[OK] Audio alignment complete.")
         print("[*] Loading diarization model...")
 
         diarize_model: DiarizationPipeline = DiarizationPipeline(
             token=HF_TOKEN, device=DEVICE
         )
 
-        print("[OK] Diarization model loaded")
+        print("[OK] Diarization model loaded.")
         print("[*] Performing diarization...")
 
         segments: pd.DataFrame = cast(
             pd.DataFrame, diarize_model(audio=audio, num_speakers=num_speakers)
         )
 
-        print("[OK] Diarization complete")
+        print("[OK] Diarization complete.")
         print("[*] Assigning speakers to segments...")
 
         result = whisperx.assign_word_speakers(segments, aligned_transcription)
 
-        print("[OK] Speaker segments successfully assigned")
+        print("[OK] Speaker segments successfully assigned.")
 
-        print(type(result))
+        # See transcription in readable format:
+        print("\nTranscription:")
+        for segment in result["segments"]:
+            print(f"{segment['speaker']}: {segment['text']}")
+
+        # See raw transcription data:
+        import json
+        print(json.dumps(result, indent=4))
 
     except ValueError as e:
         print(f"[ERROR] ValueError: {e}")
