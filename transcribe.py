@@ -1,5 +1,8 @@
 """"""
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
 
 import os
 from typing import Any, cast
@@ -10,12 +13,11 @@ import whisperx
 from whisperx.asr import FasterWhisperPipeline, TranscriptionResult
 from whisperx.diarize import DiarizationPipeline
 
-# Global Configuration
 COMPUTE_TYPE: str = "float16"
 DEVICE: str = "cuda"
 BATCH_SIZE: int = 16
-HF_TOKEN: str = "INSERT_HF_TOKEN_HERE"
-DEFAULT_TRANSCRIPTION_MODEL: str = 'medium.en'
+HF_TOKEN: str = ""
+DEFAULT_TRANSCRIPTION_MODEL: str = "medium.en"
 TRANSCRIPTION_MODELS: list[str] = [
     "tiny.en",
     "base.en",
@@ -27,6 +29,20 @@ TRANSCRIPTION_MODELS: list[str] = [
 ]
 
 
+def get_str_input(message: str = "") -> str:
+    """"""
+    input_val = input(f"{message}:\n>>> ")
+    print()
+    return input_val
+
+
+def get_int_input(message: str = "") -> int:
+    """"""
+    input_val = input(f"{message}:\n>>> ")
+    print()
+    return int(input_val)
+
+
 def validate_file_path(file_path: str) -> bool:
     """"""
     return (
@@ -36,23 +52,29 @@ def validate_file_path(file_path: str) -> bool:
 
 def select_transcription_model() -> str:
     """"""
-    for number, model in enumerate(TRANSCRIPTION_MODELS):
-        print(f"[{number}] {model}")
+    print("Available Transcription Models:")
 
+    for index, model_name in enumerate(TRANSCRIPTION_MODELS):
+        print(f"[{index + 1}] {model_name}")
+
+    print()
     model: str = DEFAULT_TRANSCRIPTION_MODEL
 
     try:
-        model_index: int = int(input(f"Select a model:\n>>> "))
-        model = TRANSCRIPTION_MODELS[model_index]
+        model_index: int = get_int_input(message="Select a model")
+        model = TRANSCRIPTION_MODELS[model_index - 1]
     except (ValueError, IndexError) as e:
-        print(f"Invalid transcription model choice. Defaulting to {DEFAULT_TRANSCRIPTION_MODEL}")
+        print(
+            f"Invalid transcription model choice. Defaulting to {DEFAULT_TRANSCRIPTION_MODEL}"
+        )
 
     return model
+
 
 def main() -> None:
     """"""
     try:
-        num_speakers_input: str = input(f"How many speakers?:\n>>> ")
+        num_speakers_input: str = get_str_input(message="How many speakers?")
 
         if not num_speakers_input.isdigit():
             raise ValueError(
@@ -61,18 +83,19 @@ def main() -> None:
 
         num_speakers: int = int(num_speakers_input)
 
-        file_path_input: str = input(f"Enter file path:\n>>> ")
+        file_path_input: str = get_str_input(message="Enter file path")
 
         if not validate_file_path(file_path_input):
             raise ValueError(f"Invalid file path: {file_path_input}")
 
         file_path: str = file_path_input
-
-        print("[OK] Validated file path")
-        print("[*] Loading transcription model...")
-
         selected_model: str = select_transcription_model()
-        transcription_model: FasterWhisperPipeline = whisperx.load_model(selected_model)
+
+        print(f"[*] Loading transcription model '{selected_model}'...")
+
+        transcription_model: FasterWhisperPipeline = whisperx.load_model(
+            selected_model, device=DEVICE, compute_type=COMPUTE_TYPE
+        )
 
         print("[OK] Transcription model successfully loaded")
 
@@ -101,7 +124,6 @@ def main() -> None:
             metadata,
             audio,
             DEVICE,
-            return_chat_alignments=False,
         )
 
         print("[OK] Transcription and audio alignment complete")

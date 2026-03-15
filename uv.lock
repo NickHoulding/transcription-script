@@ -1729,6 +1729,7 @@ dependencies = [
     { name = "black" },
     { name = "isort" },
     { name = "mypy" },
+    { name = "torchcodec" },
     { name = "whisperx" },
 ]
 
@@ -1737,6 +1738,7 @@ requires-dist = [
     { name = "black", specifier = ">=26.3.1" },
     { name = "isort", specifier = ">=8.0.1" },
     { name = "mypy", specifier = ">=1.19.1" },
+    { name = "torchcodec", specifier = ">=0.10.0" },
     { name = "whisperx", specifier = ">=3.8.2" },
 ]
 
