@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore", module="pyannote")
 warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
 
 import os
+from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
@@ -111,6 +112,18 @@ def validate_file_path(file_path: str) -> bool:
     )
 
 
+def validate_save_path(save_path: str) -> bool:
+    """Return True only if save_path points to an existing directory.
+
+    Args:
+      save_path: The filesystem path to validate.
+
+    Returns:
+      True if the path is non-empty, exists, and is a directory; False otherwise.
+    """
+    return len(save_path) > 0 and os.path.exists(save_path) and os.path.isdir(save_path)
+
+
 def validate_hf_token() -> None:
     """Ensure HF_TOKEN is set; raise RuntimeError if it is empty.
 
@@ -156,15 +169,57 @@ def select_transcription_model() -> str:
             raise IndexError(f"Choice {model_index} is out of range.")
 
         model = TRANSCRIPTION_MODELS[model_index - 1]
+    except KeyboardInterrupt:
+        raise
     except (ValueError, IndexError) as e:
         print(
             f"Invalid model choice ({e}). "
             f"Defaulting to transcription model '{DEFAULT_TRANSCRIPTION_MODEL}'."
         )
-    except KeyboardInterrupt:
-        raise
 
     return model
+
+
+# =============================================================================
+# File Creation Helpers
+# =============================================================================
+
+
+def write_txt(file_name: str, result: dict[str, Any], save_path: str = ".") -> None:
+    """Write the speaker-labelled transcript to a .txt file.
+
+    Args:
+      file_name: Output filename stem (no extension).
+      result: WhisperX result dict containing a 'segments' list.
+      save_path: Directory to write the file into. Defaults to the current directory.
+
+    Raises:
+      OSError: If the file cannot be created or written.
+    """
+    file_path: Path = Path(save_path) / f"{file_name}_transcription.txt"
+    
+    with open(file_path, "w") as f:
+        for segment in result["segments"]:
+            speaker: str = segment.get("speaker", "UNKNOWN")
+            text: str = segment.get("text", "")
+            f.write(f"{speaker}: {text.strip()}\n")
+
+
+def write_json(file_name: str, result: dict[str, Any], save_path: str = ".") -> None:
+    """Write the full WhisperX result to a .json file.
+
+    Args:
+      file_name: Output filename stem (no extension).
+      result: WhisperX result dict to serialise.
+      save_path: Directory to write the file into. Defaults to the current directory.
+
+    Raises:
+      OSError: If the file cannot be created or written.
+    """
+    file_path: Path = Path(save_path) / f"{file_name}_transcription.json"
+
+    with open(file_path, "w") as f:
+        json.dump(result, f, indent=4)
 
 
 # =============================================================================
@@ -201,7 +256,7 @@ def main() -> None:
                 f"Number of speakers must be at least 1, got {num_speakers}."
             )
 
-        file_path_input: str = get_str_input(message="Enter file path:")
+        file_path_input: str = get_str_input(message="Enter file path (absolute):")
 
         if not validate_file_path(file_path_input):
             raise ValueError(
@@ -210,6 +265,15 @@ def main() -> None:
             )
 
         file_path: str = file_path_input
+        save_path_input: str = get_str_input(message="Enter save path (absolute):")
+
+        if not validate_save_path(save_path_input):
+            raise ValueError(
+                f"Invalid save path: '{save_path_input}'. "
+                "The path must point to an existing directory."
+            )
+
+        save_path: str = save_path_input
         selected_model: str = select_transcription_model()
 
         print(f"[*] Loading transcription model '{selected_model}'...")
@@ -223,6 +287,7 @@ def main() -> None:
             ) from e
 
         print("[OK] Transcription model successfully loaded.")
+        print("[*] Loading audio...")
 
         try:
             audio: np.ndarray = whisperx.load_audio(file_path)
@@ -293,14 +358,22 @@ def main() -> None:
 
         print("[OK] Speaker segments successfully assigned.")
 
-        print("\nTranscription:")
-        for segment in result["segments"]:
-            speaker: str = segment.get("speaker", "UNKNOWN")
-            text: str = segment.get("text", "")
-            print(f"{speaker}: {text}")
+        try:
+            print("[*] Writing TXT file...")
+            
+            save_file_name: str = Path(file_path).stem
+            write_txt(save_file_name, save_path=save_path, result=result)
 
-        print()
-        print(json.dumps(result, indent=4))
+            print(f"[OK] TXT successfully written to '{save_path}'.")
+            print("[*] Writing JSON file...")
+
+            write_json(save_file_name, save_path=save_path, result=result)
+
+            print(f"[OK] JSON file successfully written to '{save_path}'.")
+        except OSError as e:
+            raise RuntimeError(
+                f"Failed to write output files to '{save_path}': {e}"
+            ) from e
 
     except KeyboardInterrupt:
         print("\n[CANCELLED] Interrupted by user.")

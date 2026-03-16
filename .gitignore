@@ -1,1 +1,11 @@
+# Secrets
 .env
+
+# Caches
+.venv/
+.ruff_cache/
+.mypy_cache/
+
+# Directories
+media/
+
