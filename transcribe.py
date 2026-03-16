@@ -197,7 +197,7 @@ def write_txt(file_name: str, result: dict[str, Any], save_path: str = ".") -> N
       OSError: If the file cannot be created or written.
     """
     file_path: Path = Path(save_path) / f"{file_name}_transcription.txt"
-    
+
     with open(file_path, "w") as f:
         for segment in result["segments"]:
             speaker: str = segment.get("speaker", "UNKNOWN")
@@ -256,7 +256,9 @@ def main() -> None:
                 f"Number of speakers must be at least 1, got {num_speakers}."
             )
 
-        file_path_input: str = get_str_input(message="Enter file path (absolute):")
+        file_path_input: str = get_str_input(
+            message="Enter path to input file (absolute):"
+        )
 
         if not validate_file_path(file_path_input):
             raise ValueError(
@@ -265,7 +267,9 @@ def main() -> None:
             )
 
         file_path: str = file_path_input
-        save_path_input: str = get_str_input(message="Enter save path (absolute):")
+        save_path_input: str = get_str_input(
+            message="Enter path to existing save directory (absolute):"
+        )
 
         if not validate_save_path(save_path_input):
             raise ValueError(
@@ -360,7 +364,7 @@ def main() -> None:
 
         try:
             print("[*] Writing TXT file...")
-            
+
             save_file_name: str = Path(file_path).stem
             write_txt(save_file_name, save_path=save_path, result=result)
 
