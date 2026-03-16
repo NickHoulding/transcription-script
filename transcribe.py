@@ -70,7 +70,7 @@ def get_str_input(message: str = "") -> str:
     try:
         input_val: str = input(f"{message}\n>>> ")
         print()
-        return input_val.strip()
+        return input_val.strip().strip("\"'")
     except KeyboardInterrupt:
         print()
         raise
