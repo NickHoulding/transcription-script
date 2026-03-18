@@ -13,6 +13,11 @@ dependencies = [
     "whisperx>=3.8.2",
 ]
 
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = "transcription-script"
+
 [tool.black]
 line-length = 88
 target-version = ['py311']
@@ -27,3 +32,8 @@ exclude = '''
   | data
 )/
 '''
+
+[tool.mypy]
+python_version = 3.11
+strict = true
+disable_error_code = ["import-untyped"]
