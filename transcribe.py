@@ -1,54 +1,10 @@
 """Transcription script using WhisperX for ASR, alignment, and speaker diarization."""
 
-import json
-import logging
-import sys
-import warnings
-
-# Suppress logging output before any whisperx/pyannote imports
-logging.getLogger("whisperx").setLevel(logging.ERROR)
-logging.getLogger("whisperx.vads.pyannote").setLevel(logging.ERROR)
-logging.getLogger("whisperx.diarize").setLevel(logging.ERROR)
-logging.getLogger("pyannote").setLevel(logging.ERROR)
-logging.getLogger("lightning.pytorch").setLevel(logging.ERROR)
-logging.getLogger("lightning.pytorch.utilities.migration.utils").setLevel(logging.ERROR)
-
-warnings.filterwarnings("ignore", module="whisperx")
-warnings.filterwarnings("ignore", module="pyannote")
-warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
-
 import os
-from pathlib import Path
-from typing import Any, cast
+import sys
 
-import numpy as np
-import pandas as pd
-import whisperx
-from dotenv import load_dotenv
-from whisperx.asr import FasterWhisperPipeline, TranscriptionResult
-from whisperx.diarize import DiarizationPipeline
-
-load_dotenv()
-
-# =============================================================================
-# Configuration
-# =============================================================================
-
-COMPUTE_TYPE: str = "float16"
-DEVICE: str = "cuda"
-BATCH_SIZE: int = 16
-HF_TOKEN: str = os.getenv("HF_TOKEN") or ""
-DEFAULT_TRANSCRIPTION_MODEL: str = "medium.en"
-TRANSCRIPTION_MODELS: list[str] = [
-    "tiny.en",
-    "base.en",
-    "small.en",
-    "medium.en",
-    "large-v2",
-    "large-v3",
-    "turbo",
-]
-
+from config import Config
+from pipeline import TranscriptionPipeline
 
 # =============================================================================
 # Input helpers
@@ -130,7 +86,7 @@ def validate_hf_token() -> None:
     Raises:
       RuntimeError: If HF_TOKEN is not set or is an empty string.
     """
-    if not HF_TOKEN:
+    if not Config.hf_token:
         raise RuntimeError(
             "HF_TOKEN is not set. Add it to your .env file as HF_TOKEN=<your_token>."
         )
@@ -155,85 +111,38 @@ def select_transcription_model() -> str:
       KeyboardInterrupt: Re-raised so main() can handle Ctrl-C cleanly.
     """
     print("Available Transcription Models:")
-    for index, model_name in enumerate(TRANSCRIPTION_MODELS):
+    for index, model_name in enumerate(Config.transcription_models):
         print(f"[{index + 1}] {model_name}")
     print()
 
-    model: str = DEFAULT_TRANSCRIPTION_MODEL
+    model: str = Config.default_model
 
     try:
-        message: str = f"Select a model [1-{len(TRANSCRIPTION_MODELS)}]:"
+        message: str = f"Select a model [1-{len(Config.transcription_models)}]:"
         model_index: int = get_int_input(message=message)
 
-        if model_index < 1 or model_index > len(TRANSCRIPTION_MODELS):
+        if model_index < 1 or model_index > len(Config.transcription_models):
             raise IndexError(f"Choice {model_index} is out of range.")
 
-        model = TRANSCRIPTION_MODELS[model_index - 1]
+        model = Config.transcription_models[model_index - 1]
     except KeyboardInterrupt:
         raise
     except (ValueError, IndexError) as e:
         print(
             f"Invalid model choice ({e}). "
-            f"Defaulting to transcription model '{DEFAULT_TRANSCRIPTION_MODEL}'."
+            f"Defaulting to transcription model '{Config.default_model}'."
         )
 
     return model
 
 
 # =============================================================================
-# File Creation Helpers
-# =============================================================================
-
-
-def write_txt(file_name: str, result: dict[str, Any], save_path: str = ".") -> None:
-    """Write the speaker-labelled transcript to a .txt file.
-
-    Args:
-      file_name: Output filename stem (no extension).
-      result: WhisperX result dict containing a 'segments' list.
-      save_path: Directory to write the file into. Defaults to the current directory.
-
-    Raises:
-      OSError: If the file cannot be created or written.
-    """
-    file_path: Path = Path(save_path) / f"{file_name}_transcription.txt"
-
-    with open(file_path, "w") as f:
-        for segment in result["segments"]:
-            speaker: str = segment.get("speaker", "UNKNOWN")
-            text: str = segment.get("text", "")
-            f.write(f"{speaker}: {text.strip()}\n")
-
-
-def write_json(file_name: str, result: dict[str, Any], save_path: str = ".") -> None:
-    """Write the full WhisperX result to a .json file.
-
-    Args:
-      file_name: Output filename stem (no extension).
-      result: WhisperX result dict to serialise.
-      save_path: Directory to write the file into. Defaults to the current directory.
-
-    Raises:
-      OSError: If the file cannot be created or written.
-    """
-    file_path: Path = Path(save_path) / f"{file_name}_transcription.json"
-
-    with open(file_path, "w") as f:
-        json.dump(result, f, indent=4)
-
-
-# =============================================================================
-# Main pipeline
+# Main
 # =============================================================================
 
 
 def main() -> None:
-    """Run the full WhisperX transcription, alignment, and diarization pipeline.
-
-    Prompts for the number of speakers, file path, and model, then runs each
-    stage in sequence. All errors are caught and printed without a traceback;
-    KeyboardInterrupt exits cleanly.
-    """
+    """Gather inputs and hand off to the transcription pipeline."""
     try:
         validate_hf_token()
     except RuntimeError as e:
@@ -266,7 +175,6 @@ def main() -> None:
                 "The path must point to an existing file."
             )
 
-        file_path: str = file_path_input
         save_path_input: str = get_str_input(
             message="Enter path to existing save directory (absolute):"
         )
@@ -277,107 +185,7 @@ def main() -> None:
                 "The path must point to an existing directory."
             )
 
-        save_path: str = save_path_input
         selected_model: str = select_transcription_model()
-
-        print(f"[*] Loading transcription model '{selected_model}'...")
-        try:
-            transcription_model: FasterWhisperPipeline = whisperx.load_model(
-                selected_model, device=DEVICE, compute_type=COMPUTE_TYPE
-            )
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to load transcription model '{selected_model}': {e}"
-            ) from e
-
-        print("[OK] Transcription model successfully loaded.")
-        print("[*] Loading audio...")
-
-        try:
-            audio: np.ndarray = whisperx.load_audio(file_path)
-        except Exception as e:
-            raise RuntimeError(f"Failed to load audio from '{file_path}': {e}") from e
-
-        print("[OK] Audio successfully loaded.")
-
-        print("[*] Transcribing...")
-        try:
-            transcription: TranscriptionResult = transcription_model.transcribe(
-                audio, batch_size=BATCH_SIZE
-            )
-        except Exception as e:
-            raise RuntimeError(f"Transcription failed: {e}") from e
-
-        print("[OK] Transcription complete.")
-
-        print("[*] Loading alignment model...")
-        try:
-            align_model, metadata = whisperx.load_align_model(
-                language_code=transcription["language"], device=DEVICE
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to load alignment model: {e}") from e
-
-        print("[OK] Alignment model loaded.")
-        print("[*] Aligning audio segments...")
-        try:
-            aligned_transcription: dict[str, Any] = whisperx.align(
-                transcription["segments"],
-                align_model,
-                metadata,
-                audio,
-                DEVICE,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Audio alignment failed: {e}") from e
-
-        print("[OK] Audio alignment complete.")
-
-        print("[*] Loading diarization model...")
-        try:
-            diarize_model: DiarizationPipeline = DiarizationPipeline(
-                token=HF_TOKEN, device=DEVICE
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to load diarization model: {e}") from e
-
-        print("[OK] Diarization model loaded.")
-        print("[*] Performing diarization...")
-        try:
-            segments: pd.DataFrame = cast(
-                pd.DataFrame, diarize_model(audio=audio, num_speakers=num_speakers)
-            )
-        except Exception as e:
-            raise RuntimeError(f"Diarization failed: {e}") from e
-
-        print("[OK] Diarization complete.")
-
-        print("[*] Assigning speakers to segments...")
-        try:
-            result: dict[str, Any] = whisperx.assign_word_speakers(
-                segments, aligned_transcription
-            )
-        except Exception as e:
-            raise RuntimeError(f"Speaker assignment failed: {e}") from e
-
-        print("[OK] Speaker segments successfully assigned.")
-
-        try:
-            print("[*] Writing TXT file...")
-
-            save_file_name: str = Path(file_path).stem
-            write_txt(save_file_name, save_path=save_path, result=result)
-
-            print(f"[OK] TXT successfully written to '{save_path}'.")
-            print("[*] Writing JSON file...")
-
-            write_json(save_file_name, save_path=save_path, result=result)
-
-            print(f"[OK] JSON file successfully written to '{save_path}'.")
-        except OSError as e:
-            raise RuntimeError(
-                f"Failed to write output files to '{save_path}': {e}"
-            ) from e
 
     except KeyboardInterrupt:
         print("\n[CANCELLED] Interrupted by user.")
@@ -385,12 +193,13 @@ def main() -> None:
     except ValueError as e:
         print(f"[ERROR] Invalid input: {e}")
         sys.exit(1)
-    except RuntimeError as e:
-        print(f"[ERROR] {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"[ERROR] Unexpected error: {type(e).__name__}: {e}")
-        sys.exit(1)
+
+    TranscriptionPipeline(
+        file_path=file_path_input,
+        save_path=save_path_input,
+        num_speakers=num_speakers,
+        model=selected_model,
+    ).run()
 
 
 if __name__ == "__main__":
