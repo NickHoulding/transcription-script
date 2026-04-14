@@ -4,6 +4,8 @@ import json
 import logging
 import sys
 import warnings
+from collections.abc import Generator
+from contextlib import contextmanager
 
 logging.getLogger("whisperx").setLevel(logging.ERROR)
 logging.getLogger("whisperx.vads.pyannote").setLevel(logging.ERROR)
@@ -22,10 +24,23 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 import whisperx
+from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from whisperx.asr import FasterWhisperPipeline, TranscriptionResult
 from whisperx.diarize import DiarizationPipeline
 
 from config import Config
+
+
+@contextmanager
+def _spinner(label: str) -> Generator[None, None, None]:
+    with Progress(
+        SpinnerColumn(),
+        TextColumn(label),
+        TimeElapsedColumn(),
+        transient=True,
+    ) as progress:
+        progress.add_task("", total=None)
+        yield
 
 
 class TranscriptionPipeline:
@@ -105,15 +120,15 @@ class TranscriptionPipeline:
         Raises:
             RuntimeError: If the model fails to load.
         """
-        print(f"[*] Loading transcription model '{self._model}'...")
-        try:
-            model: FasterWhisperPipeline = whisperx.load_model(
-                self._model, device=Config.device, compute_type=Config.compute_type
-            )
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to load transcription model '{self._model}': {e}"
-            ) from e
+        with _spinner(f"Loading transcription model '{self._model}'..."):
+            try:
+                model: FasterWhisperPipeline = whisperx.load_model(
+                    self._model, device=Config.device, compute_type=Config.compute_type
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to load transcription model '{self._model}': {e}"
+                ) from e
         print("[OK] Transcription model successfully loaded.")
         return model
 
@@ -126,13 +141,13 @@ class TranscriptionPipeline:
         Raises:
             RuntimeError: If the audio file cannot be loaded.
         """
-        print("[*] Loading audio...")
-        try:
-            audio: np.ndarray = whisperx.load_audio(self._file_path)
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to load audio from '{self._file_path}': {e}"
-            ) from e
+        with _spinner("Loading audio..."):
+            try:
+                audio: np.ndarray = whisperx.load_audio(self._file_path)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to load audio from '{self._file_path}': {e}"
+                ) from e
         print("[OK] Audio successfully loaded.")
         return audio
 
@@ -151,13 +166,13 @@ class TranscriptionPipeline:
         Raises:
             RuntimeError: If transcription fails.
         """
-        print("[*] Transcribing...")
-        try:
-            transcription: TranscriptionResult = model.transcribe(
-                audio, batch_size=Config.batch_size
-            )
-        except Exception as e:
-            raise RuntimeError(f"Transcription failed: {e}") from e
+        with _spinner("Transcribing..."):
+            try:
+                transcription: TranscriptionResult = model.transcribe(
+                    audio, batch_size=Config.batch_size
+                )
+            except Exception as e:
+                raise RuntimeError(f"Transcription failed: {e}") from e
         print("[OK] Transcription complete.")
         return transcription
 
@@ -176,26 +191,26 @@ class TranscriptionPipeline:
         Raises:
             RuntimeError: If the alignment model fails to load or alignment fails.
         """
-        print("[*] Loading alignment model...")
-        try:
-            align_model, metadata = whisperx.load_align_model(
-                language_code=transcription["language"], device=Config.device
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to load alignment model: {e}") from e
+        with _spinner("Loading alignment model..."):
+            try:
+                align_model, metadata = whisperx.load_align_model(
+                    language_code=transcription["language"], device=Config.device
+                )
+            except Exception as e:
+                raise RuntimeError(f"Failed to load alignment model: {e}") from e
         print("[OK] Alignment model loaded.")
 
-        print("[*] Aligning audio segments...")
-        try:
-            aligned: dict[str, Any] = whisperx.align(
-                transcription["segments"],
-                align_model,
-                metadata,
-                audio,
-                Config.device,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Audio alignment failed: {e}") from e
+        with _spinner("Aligning audio segments..."):
+            try:
+                aligned: dict[str, Any] = whisperx.align(
+                    transcription["segments"],
+                    align_model,
+                    metadata,
+                    audio,
+                    Config.device,
+                )
+            except Exception as e:
+                raise RuntimeError(f"Audio alignment failed: {e}") from e
         print("[OK] Audio alignment complete.")
         return aligned
 
@@ -211,23 +226,23 @@ class TranscriptionPipeline:
         Raises:
             RuntimeError: If the diarization model fails to load or diarization fails.
         """
-        print("[*] Loading diarization model...")
-        try:
-            diarize_model: DiarizationPipeline = DiarizationPipeline(
-                token=Config.hf_token, device=Config.device
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to load diarization model: {e}") from e
+        with _spinner("Loading diarization model..."):
+            try:
+                diarize_model: DiarizationPipeline = DiarizationPipeline(
+                    token=Config.hf_token, device=Config.device
+                )
+            except Exception as e:
+                raise RuntimeError(f"Failed to load diarization model: {e}") from e
         print("[OK] Diarization model loaded.")
 
-        print("[*] Performing diarization...")
-        try:
-            segments: pd.DataFrame = cast(
-                pd.DataFrame,
-                diarize_model(audio=audio, num_speakers=self._num_speakers),
-            )
-        except Exception as e:
-            raise RuntimeError(f"Diarization failed: {e}") from e
+        with _spinner("Performing diarization..."):
+            try:
+                segments: pd.DataFrame = cast(
+                    pd.DataFrame,
+                    diarize_model(audio=audio, num_speakers=self._num_speakers),
+                )
+            except Exception as e:
+                raise RuntimeError(f"Diarization failed: {e}") from e
         print("[OK] Diarization complete.")
         return segments
 
@@ -246,13 +261,13 @@ class TranscriptionPipeline:
         Raises:
             RuntimeError: If speaker assignment fails.
         """
-        print("[*] Assigning speakers to segments...")
-        try:
-            result: dict[str, Any] = whisperx.assign_word_speakers(
-                segments, aligned_transcription
-            )
-        except Exception as e:
-            raise RuntimeError(f"Speaker assignment failed: {e}") from e
+        with _spinner("Assigning speakers to segments..."):
+            try:
+                result: dict[str, Any] = whisperx.assign_word_speakers(
+                    segments, aligned_transcription
+                )
+            except Exception as e:
+                raise RuntimeError(f"Speaker assignment failed: {e}") from e
         print("[OK] Speaker segments successfully assigned.")
         return result
 
@@ -267,12 +282,12 @@ class TranscriptionPipeline:
         """
         save_file_name: str = Path(self._file_path).stem
         try:
-            print("[*] Writing TXT file...")
-            self._write_txt(save_file_name, result=result)
+            with _spinner("Writing TXT file..."):
+                self._write_txt(save_file_name, result=result)
             print(f"[OK] TXT successfully written to '{self._save_path}'.")
 
-            print("[*] Writing JSON file...")
-            self._write_json(save_file_name, result=result)
+            with _spinner("Writing JSON file..."):
+                self._write_json(save_file_name, result=result)
             print(f"[OK] JSON file successfully written to '{self._save_path}'.")
         except OSError as e:
             raise RuntimeError(
