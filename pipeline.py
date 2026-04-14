@@ -93,114 +93,206 @@ class TranscriptionPipeline:
             json.dump(result, f, indent=4)
 
     # -------------------------------------------------------------------------
+    # Pipeline step helpers
+    # -------------------------------------------------------------------------
+
+    def _load_transcription_model(self) -> FasterWhisperPipeline:
+        """Load the WhisperX transcription model.
+
+        Returns:
+            The loaded transcription model.
+
+        Raises:
+            RuntimeError: If the model fails to load.
+        """
+        print(f"[*] Loading transcription model '{self._model}'...")
+        try:
+            model: FasterWhisperPipeline = whisperx.load_model(
+                self._model, device=Config.device, compute_type=Config.compute_type
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to load transcription model '{self._model}': {e}"
+            ) from e
+        print("[OK] Transcription model successfully loaded.")
+        return model
+
+    def _load_audio(self) -> np.ndarray:
+        """Load the audio file from disk.
+
+        Returns:
+            The audio waveform as a NumPy array.
+
+        Raises:
+            RuntimeError: If the audio file cannot be loaded.
+        """
+        print("[*] Loading audio...")
+        try:
+            audio: np.ndarray = whisperx.load_audio(self._file_path)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to load audio from '{self._file_path}': {e}"
+            ) from e
+        print("[OK] Audio successfully loaded.")
+        return audio
+
+    def _transcribe(
+        self, model: FasterWhisperPipeline, audio: np.ndarray
+    ) -> TranscriptionResult:
+        """Transcribe the audio using the loaded model.
+
+        Args:
+            model: The loaded WhisperX transcription model.
+            audio: The audio waveform to transcribe.
+
+        Returns:
+            The raw transcription result.
+
+        Raises:
+            RuntimeError: If transcription fails.
+        """
+        print("[*] Transcribing...")
+        try:
+            transcription: TranscriptionResult = model.transcribe(
+                audio, batch_size=Config.batch_size
+            )
+        except Exception as e:
+            raise RuntimeError(f"Transcription failed: {e}") from e
+        print("[OK] Transcription complete.")
+        return transcription
+
+    def _align(
+        self, transcription: TranscriptionResult, audio: np.ndarray
+    ) -> dict[str, Any]:
+        """Load the alignment model and align transcription segments to the audio.
+
+        Args:
+            transcription: The raw transcription result containing segments and language.
+            audio: The audio waveform used during transcription.
+
+        Returns:
+            The aligned transcription result.
+
+        Raises:
+            RuntimeError: If the alignment model fails to load or alignment fails.
+        """
+        print("[*] Loading alignment model...")
+        try:
+            align_model, metadata = whisperx.load_align_model(
+                language_code=transcription["language"], device=Config.device
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to load alignment model: {e}") from e
+        print("[OK] Alignment model loaded.")
+
+        print("[*] Aligning audio segments...")
+        try:
+            aligned: dict[str, Any] = whisperx.align(
+                transcription["segments"],
+                align_model,
+                metadata,
+                audio,
+                Config.device,
+            )
+        except Exception as e:
+            raise RuntimeError(f"Audio alignment failed: {e}") from e
+        print("[OK] Audio alignment complete.")
+        return aligned
+
+    def _diarize(self, audio: np.ndarray) -> pd.DataFrame:
+        """Load the diarization model and assign speaker segments to the audio.
+
+        Args:
+            audio: The audio waveform to diarize.
+
+        Returns:
+            A DataFrame of speaker-labelled time segments.
+
+        Raises:
+            RuntimeError: If the diarization model fails to load or diarization fails.
+        """
+        print("[*] Loading diarization model...")
+        try:
+            diarize_model: DiarizationPipeline = DiarizationPipeline(
+                token=Config.hf_token, device=Config.device
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to load diarization model: {e}") from e
+        print("[OK] Diarization model loaded.")
+
+        print("[*] Performing diarization...")
+        try:
+            segments: pd.DataFrame = cast(
+                pd.DataFrame,
+                diarize_model(audio=audio, num_speakers=self._num_speakers),
+            )
+        except Exception as e:
+            raise RuntimeError(f"Diarization failed: {e}") from e
+        print("[OK] Diarization complete.")
+        return segments
+
+    def _assign_speakers(
+        self, segments: pd.DataFrame, aligned_transcription: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Assign speaker labels to aligned transcription segments.
+
+        Args:
+            segments: Diarization output mapping time ranges to speaker labels.
+            aligned_transcription: The aligned transcription result.
+
+        Returns:
+            The final result dict with speaker labels attached to each segment.
+
+        Raises:
+            RuntimeError: If speaker assignment fails.
+        """
+        print("[*] Assigning speakers to segments...")
+        try:
+            result: dict[str, Any] = whisperx.assign_word_speakers(
+                segments, aligned_transcription
+            )
+        except Exception as e:
+            raise RuntimeError(f"Speaker assignment failed: {e}") from e
+        print("[OK] Speaker segments successfully assigned.")
+        return result
+
+    def _write_output(self, result: dict[str, Any]) -> None:
+        """Write the final transcript to TXT and JSON output files.
+
+        Args:
+            result: The fully processed WhisperX result dict.
+
+        Raises:
+            RuntimeError: If either output file cannot be written.
+        """
+        save_file_name: str = Path(self._file_path).stem
+        try:
+            print("[*] Writing TXT file...")
+            self._write_txt(save_file_name, result=result)
+            print(f"[OK] TXT successfully written to '{self._save_path}'.")
+
+            print("[*] Writing JSON file...")
+            self._write_json(save_file_name, result=result)
+            print(f"[OK] JSON file successfully written to '{self._save_path}'.")
+        except OSError as e:
+            raise RuntimeError(
+                f"Failed to write output files to '{self._save_path}': {e}"
+            ) from e
+
+    # -------------------------------------------------------------------------
     # Public interface
     # -------------------------------------------------------------------------
 
     def run(self) -> None:
         """Run the full transcription, alignment, and diarization pipeline."""
         try:
-            print(f"[*] Loading transcription model '{self._model}'...")
-            try:
-                transcription_model: FasterWhisperPipeline = whisperx.load_model(
-                    self._model, device=Config.device, compute_type=Config.compute_type
-                )
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to load transcription model '{self._model}': {e}"
-                ) from e
-
-            print("[OK] Transcription model successfully loaded.")
-            print("[*] Loading audio...")
-
-            try:
-                audio: np.ndarray = whisperx.load_audio(self._file_path)
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to load audio from '{self._file_path}': {e}"
-                ) from e
-
-            print("[OK] Audio successfully loaded.")
-
-            print("[*] Transcribing...")
-            try:
-                transcription: TranscriptionResult = transcription_model.transcribe(
-                    audio, batch_size=Config.batch_size
-                )
-            except Exception as e:
-                raise RuntimeError(f"Transcription failed: {e}") from e
-
-            print("[OK] Transcription complete.")
-
-            print("[*] Loading alignment model...")
-            try:
-                align_model, metadata = whisperx.load_align_model(
-                    language_code=transcription["language"], device=Config.device
-                )
-            except Exception as e:
-                raise RuntimeError(f"Failed to load alignment model: {e}") from e
-
-            print("[OK] Alignment model loaded.")
-            print("[*] Aligning audio segments...")
-            try:
-                aligned_transcription: dict[str, Any] = whisperx.align(
-                    transcription["segments"],
-                    align_model,
-                    metadata,
-                    audio,
-                    Config.device,
-                )
-            except Exception as e:
-                raise RuntimeError(f"Audio alignment failed: {e}") from e
-
-            print("[OK] Audio alignment complete.")
-
-            print("[*] Loading diarization model...")
-            try:
-                diarize_model: DiarizationPipeline = DiarizationPipeline(
-                    token=Config.hf_token, device=Config.device
-                )
-            except Exception as e:
-                raise RuntimeError(f"Failed to load diarization model: {e}") from e
-
-            print("[OK] Diarization model loaded.")
-            print("[*] Performing diarization...")
-            try:
-                segments: pd.DataFrame = cast(
-                    pd.DataFrame,
-                    diarize_model(audio=audio, num_speakers=self._num_speakers),
-                )
-            except Exception as e:
-                raise RuntimeError(f"Diarization failed: {e}") from e
-
-            print("[OK] Diarization complete.")
-
-            print("[*] Assigning speakers to segments...")
-            try:
-                result: dict[str, Any] = whisperx.assign_word_speakers(
-                    segments, aligned_transcription
-                )
-            except Exception as e:
-                raise RuntimeError(f"Speaker assignment failed: {e}") from e
-
-            print("[OK] Speaker segments successfully assigned.")
-
-            try:
-                print("[*] Writing TXT file...")
-
-                save_file_name: str = Path(self._file_path).stem
-                self._write_txt(save_file_name, result=result)
-
-                print(f"[OK] TXT successfully written to '{self._save_path}'.")
-                print("[*] Writing JSON file...")
-
-                self._write_json(save_file_name, result=result)
-
-                print(f"[OK] JSON file successfully written to '{self._save_path}'.")
-            except OSError as e:
-                raise RuntimeError(
-                    f"Failed to write output files to '{self._save_path}': {e}"
-                ) from e
-
+            transcription_model = self._load_transcription_model()
+            audio = self._load_audio()
+            transcription = self._transcribe(transcription_model, audio)
+            aligned_transcription = self._align(transcription, audio)
+            segments = self._diarize(audio)
+            result = self._assign_speakers(segments, aligned_transcription)
+            self._write_output(result)
         except RuntimeError as e:
             print(f"[ERROR] {e}")
             sys.exit(1)

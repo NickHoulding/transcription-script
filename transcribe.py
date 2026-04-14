@@ -15,13 +15,13 @@ def get_str_input(message: str = "") -> str:
     """Prompt the user for a string value and return the stripped result.
 
     Args:
-      message: Optional prompt text displayed before the input cursor.
+        message: Optional prompt text displayed before the input cursor.
 
     Returns:
-      The string entered by the user (whitespace-stripped).
+        The string entered by the user (whitespace-stripped).
 
     Raises:
-      KeyboardInterrupt: Re-raised so callers can handle Ctrl-C cleanly.
+        KeyboardInterrupt: Re-raised so callers can handle Ctrl-C cleanly.
     """
     try:
         input_val: str = input(f"{message}\n>>> ")
@@ -36,14 +36,14 @@ def get_int_input(message: str = "") -> int:
     """Prompt the user for an integer value and return it.
 
     Args:
-      message: Optional prompt text displayed before the input cursor.
+        message: Optional prompt text displayed before the input cursor.
 
     Returns:
-      The integer entered by the user.
+        The integer entered by the user.
 
     Raises:
-      KeyboardInterrupt: Re-raised so callers can handle Ctrl-C cleanly.
-      ValueError: If the entered value cannot be converted to an integer.
+        KeyboardInterrupt: Re-raised so callers can handle Ctrl-C cleanly.
+        ValueError: If the entered value cannot be converted to an integer.
     """
     str_int: str = get_str_input(message=message)
     return int(str_int)
@@ -58,10 +58,10 @@ def validate_file_path(file_path: str) -> bool:
     """Return True only if file_path points to an existing regular file.
 
     Args:
-      file_path: The filesystem path to validate.
+        file_path: The filesystem path to validate.
 
     Returns:
-      True if the path is non-empty, exists, and is a regular file; False otherwise.
+        True if the path is non-empty, exists, and is a regular file; False otherwise.
     """
     return (
         len(file_path) > 0 and os.path.exists(file_path) and os.path.isfile(file_path)
@@ -72,10 +72,10 @@ def validate_save_path(save_path: str) -> bool:
     """Return True only if save_path points to an existing directory.
 
     Args:
-      save_path: The filesystem path to validate.
+        save_path: The filesystem path to validate.
 
     Returns:
-      True if the path is non-empty, exists, and is a directory; False otherwise.
+        True if the path is non-empty, exists, and is a directory; False otherwise.
     """
     return len(save_path) > 0 and os.path.exists(save_path) and os.path.isdir(save_path)
 
@@ -84,7 +84,7 @@ def validate_hf_token() -> None:
     """Ensure HF_TOKEN is set; raise RuntimeError if it is empty.
 
     Raises:
-      RuntimeError: If HF_TOKEN is not set or is an empty string.
+        RuntimeError: If HF_TOKEN is not set or is an empty string.
     """
     if not Config.hf_token:
         raise RuntimeError(
@@ -105,10 +105,10 @@ def select_transcription_model() -> str:
     or out of range.
 
     Returns:
-      The name of the selected (or default) transcription model.
+        The name of the selected (or default) transcription model.
 
     Raises:
-      KeyboardInterrupt: Re-raised so main() can handle Ctrl-C cleanly.
+        KeyboardInterrupt: Re-raised so main() can handle Ctrl-C cleanly.
     """
     print("Available Transcription Models:")
     for index, model_name in enumerate(Config.transcription_models):
