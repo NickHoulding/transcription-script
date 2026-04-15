@@ -3,6 +3,7 @@
 import json
 import logging
 import sys
+import time
 import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -31,8 +32,38 @@ from whisperx.diarize import DiarizationPipeline
 from config import Config
 
 
+def _format_elapsed_time(seconds: float) -> str:
+    """Format a duration in seconds as a human-readable string.
+
+    Args:
+        seconds: Elapsed time in seconds.
+
+    Returns:
+        A string like ``4.3s``, ``2m 07s``, or ``1h 02m 07s``, using the
+        smallest unit combination that avoids leading zero components.
+    """
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    if hours:
+        return f"{hours}h {minutes:02d}m {seconds:02d}s"
+    elif minutes:
+        return f"{minutes}m {seconds:02d}s"
+    else:
+        return f"{seconds:.1f}s"
+
+
 @contextmanager
 def _spinner(label: str) -> Generator[None, None, None]:
+    """Context manager that shows an animated spinner while a block executes.
+
+    Prints the label and elapsed time to stdout when the block exits.
+
+    Args:
+        label: Text displayed next to the spinner during execution.
+    """
+    start_time: float = time.monotonic()
+
     with Progress(
         SpinnerColumn(),
         TextColumn(label),
@@ -41,6 +72,8 @@ def _spinner(label: str) -> Generator[None, None, None]:
     ) as progress:
         progress.add_task("", total=None)
         yield
+
+    print(f"{label} ({_format_elapsed_time(time.monotonic() - start_time)})")
 
 
 class TranscriptionPipeline:
@@ -129,7 +162,6 @@ class TranscriptionPipeline:
                 raise RuntimeError(
                     f"Failed to load transcription model '{self._model}': {e}"
                 ) from e
-        print("[OK] Transcription model successfully loaded.")
         return model
 
     def _load_audio(self) -> np.ndarray:
@@ -148,7 +180,6 @@ class TranscriptionPipeline:
                 raise RuntimeError(
                     f"Failed to load audio from '{self._file_path}': {e}"
                 ) from e
-        print("[OK] Audio successfully loaded.")
         return audio
 
     def _transcribe(
@@ -173,7 +204,6 @@ class TranscriptionPipeline:
                 )
             except Exception as e:
                 raise RuntimeError(f"Transcription failed: {e}") from e
-        print("[OK] Transcription complete.")
         return transcription
 
     def _align(
@@ -198,7 +228,6 @@ class TranscriptionPipeline:
                 )
             except Exception as e:
                 raise RuntimeError(f"Failed to load alignment model: {e}") from e
-        print("[OK] Alignment model loaded.")
 
         with _spinner("Aligning audio segments"):
             try:
@@ -211,7 +240,6 @@ class TranscriptionPipeline:
                 )
             except Exception as e:
                 raise RuntimeError(f"Audio alignment failed: {e}") from e
-        print("[OK] Audio alignment complete.")
         return aligned
 
     def _diarize(self, audio: np.ndarray) -> pd.DataFrame:
@@ -233,7 +261,6 @@ class TranscriptionPipeline:
                 )
             except Exception as e:
                 raise RuntimeError(f"Failed to load diarization model: {e}") from e
-        print("[OK] Diarization model loaded.")
 
         with _spinner("Performing diarization"):
             try:
@@ -243,7 +270,6 @@ class TranscriptionPipeline:
                 )
             except Exception as e:
                 raise RuntimeError(f"Diarization failed: {e}") from e
-        print("[OK] Diarization complete.")
         return segments
 
     def _assign_speakers(
@@ -268,7 +294,6 @@ class TranscriptionPipeline:
                 )
             except Exception as e:
                 raise RuntimeError(f"Speaker assignment failed: {e}") from e
-        print("[OK] Speaker segments successfully assigned.")
         return result
 
     def _write_output(self, result: dict[str, Any]) -> None:
@@ -284,11 +309,9 @@ class TranscriptionPipeline:
         try:
             with _spinner("Writing TXT file"):
                 self._write_txt(save_file_name, result=result)
-            print(f"[OK] TXT successfully written to '{self._save_path}'.")
 
             with _spinner("Writing JSON file"):
                 self._write_json(save_file_name, result=result)
-            print(f"[OK] JSON file successfully written to '{self._save_path}'.")
         except OSError as e:
             raise RuntimeError(
                 f"Failed to write output files to '{self._save_path}': {e}"
@@ -301,6 +324,8 @@ class TranscriptionPipeline:
     def run(self) -> None:
         """Run the full transcription, alignment, and diarization pipeline."""
         try:
+            start_time: float = time.monotonic()
+
             transcription_model = self._load_transcription_model()
             audio = self._load_audio()
             transcription = self._transcribe(transcription_model, audio)
@@ -308,6 +333,10 @@ class TranscriptionPipeline:
             segments = self._diarize(audio)
             result = self._assign_speakers(segments, aligned_transcription)
             self._write_output(result)
+
+            print(
+                f"\nTotal elapsed time ({_format_elapsed_time(time.monotonic() - start_time)})"
+            )
         except RuntimeError as e:
             print(f"[ERROR] {e}")
             sys.exit(1)
