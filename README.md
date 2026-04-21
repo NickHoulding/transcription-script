@@ -180,7 +180,7 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 2. **Clone or download the project**
    ```bash
-   git clone <repository-url>  # Or download and extract ZIP
+   git clone <repository-url>
    cd transcription-script
    ```
 
@@ -193,7 +193,7 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 4. **Verify installation**
    ```bash
-   python transcribe.py --help  # Should not error (script doesn't support --help yet)
+   python transcribe.py --help
    ```
 
 #### **Method 2: Using `pip` (Alternative)**
