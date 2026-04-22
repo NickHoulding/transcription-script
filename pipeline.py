@@ -73,7 +73,8 @@ def _spinner(label: str) -> Generator[None, None, None]:
         progress.add_task("", total=None)
         yield
 
-    print(f"{label} ({_format_elapsed_time(time.monotonic() - start_time)})")
+    elapsed_time: float = time.monotonic() - start_time
+    print(f"{label} ({_format_elapsed_time(elapsed_time)})")
 
 
 class TranscriptionPipeline:
