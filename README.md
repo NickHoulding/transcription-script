@@ -333,15 +333,14 @@ Once inputs are provided, the script executes these stages:
 8. **Speaker Assignment** - Matches text to speakers
 9. **File Writing** - Generates `.txt` and `.json` outputs
 
-Each stage prints progress:
+Each stage prints its label and elapsed time on completion:
 ```
-[*] Loading transcription model 'medium.en'...
-[OK] Transcription model successfully loaded.
-[*] Loading audio...
-[OK] Audio successfully loaded.
-[*] Transcribing...
-[OK] Transcription complete.
+Loading transcription model 'medium.en' (4.3s)
+Loading audio (0.8s)
+Transcribing (2m 15s)
 ...
+
+Total elapsed time (5m 23s)
 ```
 
 ### **Example Session**
@@ -370,26 +369,18 @@ Available Transcription Models:
 Select a model [1-7]:
 >>> 4
 
-[*] Loading transcription model 'medium.en'...
-[OK] Transcription model successfully loaded.
-[*] Loading audio...
-[OK] Audio successfully loaded.
-[*] Transcribing...
-[OK] Transcription complete.
-[*] Loading alignment model...
-[OK] Alignment model loaded.
-[*] Aligning audio segments...
-[OK] Audio alignment complete.
-[*] Loading diarization model...
-[OK] Diarization model loaded.
-[*] Performing diarization...
-[OK] Diarization complete.
-[*] Assigning speakers to segments...
-[OK] Speaker segments successfully assigned.
-[*] Writing TXT file...
-[OK] TXT successfully written to '/home/nick/transcripts/'.
-[*] Writing JSON file...
-[OK] JSON file successfully written to '/home/nick/transcripts/'.
+Loading transcription model 'medium.en' (4.3s)
+Loading audio (0.8s)
+Transcribing (2m 15s)
+Loading alignment model (1.2s)
+Aligning audio segments (45.3s)
+Loading diarization model (3.1s)
+Performing diarization (1m 32s)
+Assigning speakers to segments (0.4s)
+Writing TXT file (0.1s)
+Writing JSON file (0.2s)
+
+Total elapsed time (5m 23s)
 ```
 
 ---
