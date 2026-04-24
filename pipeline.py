@@ -336,7 +336,7 @@ class TranscriptionPipeline:
             self._write_output(result)
 
             print(
-                f"\nTotal elapsed time ({_format_elapsed_time(time.monotonic() - start_time)})"
+                f"Total elapsed time ({_format_elapsed_time(time.monotonic() - start_time)})"
             )
         except RuntimeError as e:
             print(f"[ERROR] {e}")

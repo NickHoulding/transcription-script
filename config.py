@@ -3,6 +3,7 @@
 import os
 
 from dotenv import load_dotenv
+from questionary import Style
 
 load_dotenv()
 
@@ -33,3 +34,4 @@ class Config:
         "large-v3",
         "turbo",
     ]
+    prompt_style: Style = Style([("pointer", "bold")])
