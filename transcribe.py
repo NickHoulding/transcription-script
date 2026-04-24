@@ -3,6 +3,8 @@
 import os
 import sys
 
+import questionary
+
 from config import Config
 from pipeline import TranscriptionPipeline
 
@@ -24,7 +26,7 @@ def get_str_input(message: str = "") -> str:
         KeyboardInterrupt: Re-raised so callers can handle Ctrl-C cleanly.
     """
     try:
-        input_val: str = input(f"{message}\n>>> ")
+        input_val: str = questionary.text(message=message).ask()
         print()
         return input_val.strip().strip("\"'")
     except KeyboardInterrupt:
@@ -110,21 +112,12 @@ def select_transcription_model() -> str:
     Raises:
         KeyboardInterrupt: Re-raised so main() can handle Ctrl-C cleanly.
     """
-    print("Available Transcription Models:")
-    for index, model_name in enumerate(Config.transcription_models):
-        print(f"[{index + 1}] {model_name}")
-    print()
-
     model: str = Config.default_model
 
     try:
-        message: str = f"Select a model [1-{len(Config.transcription_models)}]:"
-        model_index: int = get_int_input(message=message)
-
-        if model_index < 1 or model_index > len(Config.transcription_models):
-            raise IndexError(f"Choice {model_index} is out of range.")
-
-        model = Config.transcription_models[model_index - 1]
+        model = questionary.select(
+            message="Select a model", choices=Config.transcription_models
+        ).ask()
     except KeyboardInterrupt:
         raise
     except (ValueError, IndexError) as e:
@@ -132,6 +125,7 @@ def select_transcription_model() -> str:
             f"Invalid model choice ({e}). "
             f"Defaulting to transcription model '{Config.default_model}'."
         )
+    print()
 
     return model
 
