@@ -275,8 +275,7 @@ The script will guide you through 4 steps:
 
 #### **1. Specify Number of Speakers**
 ```
-How many speakers are there?
->>> 2
+❯ Enter number of speakers: 2
 ```
 - Enter the number of distinct speakers in the audio
 - Must be a positive integer (1 or greater)
@@ -284,17 +283,16 @@ How many speakers are there?
 
 #### **2. Provide Input File Path**
 ```
-Enter path to input file (absolute):
->>> /home/user/recordings/interview_2024.mp3
+❯ Enter path to input file (absolute): /home/user/recordings/interview_2024.mp3
 ```
 - Provide the absolute path to your audio or video file
 - Supported formats: `.mp3`, `.wav`, `.m4a`, `.mp4`, `.avi`, `.mov`, etc.
-- File must exist or script will error
+- Tab completion is available for filesystem paths
+- File must exist or an inline error will prompt you to re-enter
 
 #### **3. Specify Output Directory**
 ```
-Enter path to existing save directory (absolute):
->>> /home/user/transcripts/
+❯ Enter path to existing save directory (absolute): /home/user/transcripts/
 ```
 - Provide absolute path to an existing directory
 - Output files will be saved here with `_transcription.txt` and `_transcription.json` suffixes
@@ -302,19 +300,16 @@ Enter path to existing save directory (absolute):
 
 #### **4. Select Transcription Model**
 ```
-Available Transcription Models:
-[1] tiny.en
-[2] base.en
-[3] small.en
-[4] medium.en
-[5] large-v2
-[6] large-v3
-[7] turbo
-
-Select a model [1-7]:
->>> 4
+❯ Select a model: (Use arrow keys)
+  tiny.en
+  base.en
+  small.en
+❯ medium.en
+  large-v2
+  large-v3
+  turbo
 ```
-- Choose model based on accuracy needs vs. processing time
+- Navigate with arrow keys and confirm with Enter
 - Default: `medium.en` (good balance)
 - Smaller models = faster, less accurate
 - Larger models = slower, more accurate
@@ -348,27 +343,10 @@ Total elapsed time (5m 23s)
 ```bash
 $ python transcribe.py
 
-How many speakers are there?
->>> 2
-
-Enter path to input file (absolute):
->>> /home/nick/media/interview_john_doe.mp3
-
-Enter path to existing save directory (absolute):
->>> /home/nick/transcripts/
-
-Available Transcription Models:
-[1] tiny.en
-[2] base.en
-[3] small.en
-[4] medium.en
-[5] large-v2
-[6] large-v3
-[7] turbo
-
-Select a model [1-7]:
->>> 4
-
+❯ Enter number of speakers: 2
+❯ Enter path to input file (absolute): /home/nick/media/interview_john_doe.mp3
+❯ Enter path to existing save directory (absolute): /home/nick/transcripts/
+❯ Select a model: medium.en
 Loading transcription model 'medium.en' (4.3s)
 Loading audio (0.8s)
 Transcribing (2m 15s)
@@ -379,7 +357,6 @@ Performing diarization (1m 32s)
 Assigning speakers to segments (0.4s)
 Writing TXT file (0.1s)
 Writing JSON file (0.2s)
-
 Total elapsed time (5m 23s)
 ```
 
