@@ -24,7 +24,6 @@ class Config:
         device: Inference device passed to WhisperX; auto-detected unless ``DEVICE`` is set.
         compute_type: Model precision; auto-detected by device unless ``COMPUTE_TYPE`` is set.
         batch_size: Number of audio chunks processed per transcription batch.
-        default_model: WhisperX model used when the user makes no selection.
         transcription_models: Ordered list of available WhisperX model names.
         model_dir: The root-directory-constrained path where models are downloaded/cached.
         third_party_log_level: Level applied to suppress noisy third-party loggers.
@@ -70,7 +69,6 @@ class Config:
     # WhisperX model
     # -------------------------------------------------------------------------
 
-    default_model: str = os.getenv("DEFAULT_MODEL") or "medium.en"
     transcription_models: list[str] = [
         "tiny.en",
         "base.en",

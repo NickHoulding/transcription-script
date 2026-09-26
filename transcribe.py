@@ -61,41 +61,6 @@ def validate_hf_token() -> None:
 
 
 # =============================================================================
-# Model selection
-# =============================================================================
-
-
-def select_transcription_model() -> str:
-    """Interactively prompt the user to pick a WhisperX model.
-
-    Falls back to DEFAULT_TRANSCRIPTION_MODEL if selection fails.
-
-    Returns:
-        The name of the selected (or default) transcription model.
-
-    Raises:
-        KeyboardInterrupt: Propagates so main() can handle Ctrl-C cleanly.
-    """
-    model: str = Config.default_model
-
-    try:
-        model = questionary.select(
-            message="Select a model:",
-            choices=Config.transcription_models,
-            qmark="❯",
-            pointer="❯",
-            style=Config.prompt_style,
-        ).unsafe_ask()
-    except (ValueError, IndexError) as e:
-        print(
-            f"Invalid model choice ({e}). "
-            f"Defaulting to transcription model '{Config.default_model}'."
-        )
-
-    return model
-
-
-# =============================================================================
 # Main
 # =============================================================================
 
@@ -144,7 +109,13 @@ def main() -> None:
             .resolve()
         )
 
-        selected_model: str = select_transcription_model()
+        selected_model: str = questionary.select(
+            message="Select a model:",
+            choices=Config.transcription_models,
+            qmark="❯",
+            pointer="❯",
+            style=Config.prompt_style,
+        ).unsafe_ask()
 
     except KeyboardInterrupt:
         logger.info("Run cancelled by user.")

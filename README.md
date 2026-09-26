@@ -97,7 +97,7 @@ Unlike simple transcription tools, this script preserves speaker context, making
   - `tiny.en` - Fastest, lowest accuracy
   - `medium.en` - Balanced performance (default)
   - `turbo` - Latest model with improved speed
-- Interactive model selection at runtime, with a configurable default
+- Interactive model selection at runtime
 
 ### **Self-Contained Model Storage**
 - **Project-local model cache** - Whisper, alignment, and diarization models download into a top-level `models/` directory instead of your global Hugging Face/torch caches, so the project's model footprint stays self-contained and easy to locate or wipe
@@ -274,7 +274,6 @@ All configuration lives in `config.py` as static fields on the `Config` class, l
 | `DEVICE` | No | auto-detected (`cuda` if available, else `cpu`) | Inference device passed to WhisperX |
 | `COMPUTE_TYPE` | No | auto-detected (`float16` on `cuda`, `int8` on `cpu`) | Model precision passed to WhisperX |
 | `BATCH_SIZE` | No | `16` | Number of audio chunks processed per transcription batch |
-| `DEFAULT_MODEL` | No | `medium.en` | WhisperX model used when no selection is made. Choices: `tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v2`, `large-v3`, `turbo` |
 | `MODEL_DIR` | No | `models` (project root) | Top-level directory models are downloaded/cached into |
 | `THIRD_PARTY_LOG_LEVEL` | No | `ERROR` | Log level applied to noisy third-party loggers (WhisperX, pyannote, PyTorch Lightning), mainly used to suppress noise. Choices: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `WARNINGS_ENABLED` | No | `true` | Whether third-party warning filters are installed. Choices: `true`, `false` |
@@ -333,16 +332,15 @@ The script will guide you through 4 steps:
 #### **4. Select Transcription Model**
 ```
 ❯ Select a model: (Use arrow keys)
-  tiny.en
+❯ tiny.en
   base.en
   small.en
-❯ medium.en
+  medium.en
   large-v2
   large-v3
   turbo
 ```
 - Navigate with arrow keys and confirm with Enter
-- Default: `medium.en` (good balance)
 - Smaller models = faster, less accurate
 - Larger models = slower, more accurate
 
