@@ -64,13 +64,13 @@ class Config:
     compute_type: str = os.getenv("COMPUTE_TYPE") or (
         "float16" if device == "cuda" else "int8"
     )
-    batch_size: int = int(os.getenv("BATCH_SIZE", "16"))
+    batch_size: int = int(os.getenv("BATCH_SIZE") or "16")
 
     # -------------------------------------------------------------------------
     # WhisperX model
     # -------------------------------------------------------------------------
 
-    default_model: str = os.getenv("DEFAULT_MODEL", "medium.en")
+    default_model: str = os.getenv("DEFAULT_MODEL") or "medium.en"
     transcription_models: list[str] = [
         "tiny.en",
         "base.en",
@@ -80,7 +80,7 @@ class Config:
         "large-v3",
         "turbo",
     ]
-    model_dir: Path = _PROJECT_ROOT / os.getenv("MODEL_DIR", "models")
+    model_dir: Path = _PROJECT_ROOT / (os.getenv("MODEL_DIR") or "models")
 
     @staticmethod
     def _configure_model_storage() -> None:
@@ -91,9 +91,9 @@ class Config:
     # Application logging
     # -------------------------------------------------------------------------
 
-    log_dir: Path = _PROJECT_ROOT / os.getenv("LOG_DIR", "logs")
-    log_level: str = os.getenv("LOG_LEVEL", "INFO")
-    log_retention_count: int = int(os.getenv("LOG_RETENTION_COUNT", "10"))
+    log_dir: Path = _PROJECT_ROOT / (os.getenv("LOG_DIR") or "logs")
+    log_level: str = os.getenv("LOG_LEVEL") or "INFO"
+    log_retention_count: int = int(os.getenv("LOG_RETENTION_COUNT") or "10")
 
     @staticmethod
     def _configure_app_logging() -> None:
@@ -124,7 +124,7 @@ class Config:
     # Third-party logging
     # -------------------------------------------------------------------------
 
-    third_party_log_level: str = os.getenv("THIRD_PARTY_LOG_LEVEL", "ERROR")
+    third_party_log_level: str = os.getenv("THIRD_PARTY_LOG_LEVEL") or "ERROR"
 
     _third_party_logging_modules: list[str] = [
         "whisperx",
@@ -148,8 +148,8 @@ class Config:
     # Warnings
     # -------------------------------------------------------------------------
 
-    warnings_enabled: bool = os.getenv("WARNINGS_ENABLED", "true").lower() == "true"
-    warnings_action: str = os.getenv("WARNINGS_ACTION", "ignore")
+    warnings_enabled: bool = (os.getenv("WARNINGS_ENABLED") or "true").lower() == "true"
+    warnings_action: str = os.getenv("WARNINGS_ACTION") or "ignore"
 
     _warning_modules: list[str] = ["whisperx", "pyannote", "pyannote.audio.core.io"]
 
