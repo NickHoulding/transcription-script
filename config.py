@@ -26,6 +26,7 @@ class Config:
         batch_size: Number of audio chunks processed per transcription batch.
         transcription_models: Ordered list of available WhisperX model names.
         model_dir: The root-directory-constrained path where models are downloaded/cached.
+        default_formats: Output formats pre-checked in the format selection prompt.
         third_party_log_level: Level applied to suppress noisy third-party loggers.
         warnings_enabled: Whether third-party warning filters are installed.
         warnings_action: Action passed to ``warnings.filterwarnings`` (e.g. ``"ignore"``).
@@ -84,6 +85,12 @@ class Config:
     def _configure_model_storage() -> None:
         """Ensure ``Config.model_dir`` exists so models download/cache into the project."""
         Config.model_dir.mkdir(parents=True, exist_ok=True)
+
+    # -------------------------------------------------------------------------
+    # Serialization
+    # -------------------------------------------------------------------------
+
+    default_formats: set[str] = {".txt", ".json"}
 
     # -------------------------------------------------------------------------
     # Application logging

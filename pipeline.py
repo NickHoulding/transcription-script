@@ -8,7 +8,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from config import Config
 
@@ -75,7 +75,7 @@ class TranscriptionPipeline:
     """Runs the full WhisperX transcription, alignment, and diarization pipeline.
 
     Accepts pre-validated inputs and executes each processing stage in sequence,
-    writing a TXT and JSON transcript to the specified save directory.
+    writing a transcript in each requested format to the specified save directory.
     """
 
     def __init__(
@@ -84,6 +84,7 @@ class TranscriptionPipeline:
         save_path: str,
         num_speakers: int,
         model: str,
+        formats: list[str],
     ) -> None:
         """Initialise the pipeline with pre-validated run parameters.
 
@@ -92,15 +93,37 @@ class TranscriptionPipeline:
             save_path: Path to the directory where output files are written.
             num_speakers: Expected number of speakers in the audio.
             model: WhisperX model name to use for transcription.
+            formats: Output format extensions to write.
         """
         self._file_path = file_path
         self._save_path = save_path
         self._num_speakers = num_speakers
         self._model = model
+        self._formats = formats
 
     # -------------------------------------------------------------------------
     # File creation helpers
     # -------------------------------------------------------------------------
+
+    def _write(self, result: dict[str, Any]) -> None:
+        """Write the final transcript to each requested output format.
+
+        Args:
+            result: The fully processed WhisperX result dict.
+
+        Raises:
+            RuntimeError: If any output file cannot be written.
+        """
+        save_file_name: str = Path(self._file_path).stem
+
+        try:
+            for fmt in self._formats:
+                with _spinner(f"Writing {fmt} file"):
+                    self._SERIALIZERS[fmt](self, save_file_name, result)
+        except OSError as e:
+            raise RuntimeError(
+                f"Failed to write output files to '{self._save_path}': {e}"
+            ) from e
 
     def _write_txt(self, file_name: str, result: dict[str, Any]) -> None:
         """Write the speaker-labelled transcript to a .txt file.
@@ -134,6 +157,18 @@ class TranscriptionPipeline:
 
         with open(file_path, "w") as f:
             json.dump(result, f, indent=4)
+
+    @classmethod
+    def available_formats(cls) -> list[str]:
+        """Output format extensions this pipeline can serialize to."""
+        return list(cls._SERIALIZERS.keys())
+
+    _SERIALIZERS: dict[
+        str, Callable[["TranscriptionPipeline", str, dict[str, Any]], None]
+    ] = {
+        ".txt": _write_txt,
+        ".json": _write_json,
+    }
 
     # -------------------------------------------------------------------------
     # Pipeline step helpers
@@ -298,27 +333,6 @@ class TranscriptionPipeline:
                 raise RuntimeError(f"Speaker assignment failed: {e}") from e
         return result
 
-    def _write_output(self, result: dict[str, Any]) -> None:
-        """Write the final transcript to TXT and JSON output files.
-
-        Args:
-            result: The fully processed WhisperX result dict.
-
-        Raises:
-            RuntimeError: If either output file cannot be written.
-        """
-        save_file_name: str = Path(self._file_path).stem
-        try:
-            with _spinner("Writing TXT file"):
-                self._write_txt(save_file_name, result=result)
-
-            with _spinner("Writing JSON file"):
-                self._write_json(save_file_name, result=result)
-        except OSError as e:
-            raise RuntimeError(
-                f"Failed to write output files to '{self._save_path}': {e}"
-            ) from e
-
     # -------------------------------------------------------------------------
     # Public interface
     # -------------------------------------------------------------------------
@@ -341,7 +355,7 @@ class TranscriptionPipeline:
             aligned_transcription = self._align(transcription, audio)
             segments = self._diarize(audio)
             result = self._assign_speakers(segments, aligned_transcription)
-            self._write_output(result)
+            self._write(result)
 
             total_elapsed = _format_elapsed_time(time.monotonic() - start_time)
             print(f"Total elapsed time ({total_elapsed})")

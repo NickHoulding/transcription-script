@@ -117,6 +117,17 @@ def main() -> None:
             style=Config.prompt_style,
         ).unsafe_ask()
 
+        selected_formats: list[str] = questionary.checkbox(
+            message="Select desired output format(s)",
+            choices=[
+                questionary.Choice(fmt, checked=fmt in Config.default_formats)
+                for fmt in TranscriptionPipeline.available_formats()
+            ],
+            qmark="❯",
+            pointer="❯",
+            style=Config.prompt_style,
+        ).unsafe_ask()
+
     except KeyboardInterrupt:
         logger.info("Run cancelled by user.")
         print("\n[CANCELLED] Interrupted by user.")
@@ -127,6 +138,7 @@ def main() -> None:
         save_path=save_path_input,
         num_speakers=num_speakers,
         model=selected_model,
+        formats=selected_formats,
     ).run()
 
 
