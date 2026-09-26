@@ -1,6 +1,8 @@
 """Centralized configuration loaded from environment variables."""
 
 import os
+from datetime import datetime
+from pathlib import Path
 from typing import Literal, cast
 
 from dotenv import load_dotenv
@@ -9,6 +11,8 @@ import logging
 import warnings
 
 load_dotenv()
+
+_PROJECT_ROOT: Path = Path(__file__).resolve().parent
 
 
 class Config:
@@ -21,9 +25,12 @@ class Config:
         batch_size: Number of audio chunks processed per transcription batch.
         default_model: WhisperX model used when the user makes no selection.
         transcription_models: Ordered list of available WhisperX model names.
-        log_level: Level applied to noisy third-party loggers (e.g. ``"ERROR"``).
+        third_party_log_level: Level applied to suppress noisy third-party loggers.
         warnings_enabled: Whether third-party warning filters are installed.
         warnings_action: Action passed to ``warnings.filterwarnings`` (e.g. ``"ignore"``).
+        log_dir: The root-directory-constrained path application log files are written to.
+        log_level: Level applied to the application's own logger (e.g. ``"INFO"``).
+        log_retention_count: Number of most-recent run log files kept in ``log_dir``.
         prompt_style: Questionary style applied to interactive CLI prompts.
     """
 
@@ -34,7 +41,8 @@ class Config:
     @staticmethod
     def configure() -> None:
         """Apply logging and warning configuration. Call once at import time."""
-        Config._configure_logging()
+        Config._configure_app_logging()
+        Config._configure_third_party_logging()
         Config._configure_warnings()
 
     # -------------------------------------------------------------------------
@@ -67,12 +75,45 @@ class Config:
     ]
 
     # -------------------------------------------------------------------------
-    # Logging
+    # Application logging
     # -------------------------------------------------------------------------
 
-    log_level: str = os.getenv("LOG_LEVEL", "ERROR")
+    log_dir: Path = _PROJECT_ROOT / os.getenv("LOG_DIR", "logs")
+    log_level: str = os.getenv("LOG_LEVEL", "INFO")
+    log_retention_count: int = int(os.getenv("LOG_RETENTION_COUNT", "10"))
 
-    _logging_modules: list[str] = [
+    @staticmethod
+    def _configure_app_logging() -> None:
+        """Write application logs for this run to a timestamped file under ``Config.log_dir``."""
+        Config.log_dir.mkdir(parents=True, exist_ok=True)
+        log_file: Path = Config.log_dir / f"{datetime.now():%Y%m%d_%H%M%S}.log"
+
+        handler = logging.FileHandler(log_file)
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+        )
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(Config.log_level)
+        root_logger.addHandler(handler)
+
+        Config._prune_old_logs()
+
+    @staticmethod
+    def _prune_old_logs() -> None:
+        """Delete old run log files beyond ``Config.log_retention_count``, keeping the most recent."""
+        log_files = sorted(Config.log_dir.glob("*.log"), key=lambda p: p.name)
+        excess = len(log_files) - Config.log_retention_count
+        for old_file in log_files[: max(excess, 0)]:
+            old_file.unlink(missing_ok=True)
+
+    # -------------------------------------------------------------------------
+    # Third-party logging
+    # -------------------------------------------------------------------------
+
+    third_party_log_level: str = os.getenv("THIRD_PARTY_LOG_LEVEL", "ERROR")
+
+    _third_party_logging_modules: list[str] = [
         "whisperx",
         "whisperx.vads.pyannote",
         "whisperx.diarize",
@@ -82,10 +123,13 @@ class Config:
     ]
 
     @staticmethod
-    def _configure_logging() -> None:
-        """Set the log level of noisy third-party loggers to ``Config.log_level``."""
-        for module in Config._logging_modules:
-            logging.getLogger(module).setLevel(Config.log_level)
+    def _configure_third_party_logging() -> None:
+        """Set the log level of noisy third-party loggers to ``Config.third_party_log_level``.
+
+        Mainly used to suppress noisy logs from project dependencies.
+        """
+        for module in Config._third_party_logging_modules:
+            logging.getLogger(module).setLevel(Config.third_party_log_level)
 
     # -------------------------------------------------------------------------
     # Warnings

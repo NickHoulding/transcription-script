@@ -1,6 +1,7 @@
 """Transcription pipeline class using WhisperX for ASR, alignment, and speaker diarization."""
 
 import json
+import logging
 import sys
 import time
 from collections.abc import Generator
@@ -19,6 +20,8 @@ import whisperx
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from whisperx.asr import FasterWhisperPipeline, TranscriptionResult
 from whisperx.diarize import DiarizationPipeline
+
+logger = logging.getLogger(__name__)
 
 
 def _format_elapsed_time(seconds: float) -> str:
@@ -63,7 +66,9 @@ def _spinner(label: str) -> Generator[None, None, None]:
         yield
 
     elapsed_time: float = time.monotonic() - start_time
-    print(f"{label} ({_format_elapsed_time(elapsed_time)})")
+    message = f"{label} ({_format_elapsed_time(elapsed_time)})"
+    print(message)
+    logger.info(message)
 
 
 class TranscriptionPipeline:
@@ -313,6 +318,13 @@ class TranscriptionPipeline:
 
     def run(self) -> None:
         """Run the full transcription, alignment, and diarization pipeline."""
+        logger.info(
+            "Starting pipeline run: (file_path=%s, save_path=%s, num_speakers=%d, model=%s)",
+            self._file_path,
+            self._save_path,
+            self._num_speakers,
+            self._model,
+        )
         try:
             start_time: float = time.monotonic()
 
@@ -324,12 +336,14 @@ class TranscriptionPipeline:
             result = self._assign_speakers(segments, aligned_transcription)
             self._write_output(result)
 
-            print(
-                f"Total elapsed time ({_format_elapsed_time(time.monotonic() - start_time)})"
-            )
+            total_elapsed = _format_elapsed_time(time.monotonic() - start_time)
+            print(f"Total elapsed time ({total_elapsed})")
+            logger.info("Pipeline completed (total elapsed time %s)", total_elapsed)
         except RuntimeError as e:
+            logger.error("Pipeline failed: %s", e, exc_info=True)
             print(f"[ERROR] {e}")
             sys.exit(1)
         except Exception as e:
+            logger.error("Pipeline failed with unexpected error: %s", e, exc_info=True)
             print(f"[ERROR] Unexpected error: {type(e).__name__}: {e}")
             sys.exit(1)

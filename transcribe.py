@@ -1,5 +1,6 @@
 """Transcription script using WhisperX for ASR, alignment, and speaker diarization."""
 
+import logging
 import os
 import sys
 
@@ -7,6 +8,8 @@ import questionary
 
 from config import Config
 from pipeline import TranscriptionPipeline
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Validation
@@ -99,6 +102,7 @@ def main() -> None:
     try:
         validate_hf_token()
     except RuntimeError as e:
+        logger.error("Configuration error: %s", e, exc_info=True)
         print(f"[ERROR] Configuration error: {e}")
         sys.exit(1)
 
@@ -128,6 +132,7 @@ def main() -> None:
         selected_model: str = select_transcription_model()
 
     except KeyboardInterrupt:
+        logger.info("Run cancelled by user.")
         print("\n[CANCELLED] Interrupted by user.")
         sys.exit(0)
 
@@ -140,4 +145,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.error("Unexpected error: %s", e, exc_info=True)
+        print(f"[ERROR] Unexpected error: {type(e).__name__}: {e}")
+        sys.exit(1)
