@@ -1,26 +1,17 @@
 """Transcription pipeline class using WhisperX for ASR, alignment, and speaker diarization."""
 
 import json
-import logging
 import sys
 import time
-import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
 
-logging.getLogger("whisperx").setLevel(logging.ERROR)
-logging.getLogger("whisperx.vads.pyannote").setLevel(logging.ERROR)
-logging.getLogger("whisperx.diarize").setLevel(logging.ERROR)
-logging.getLogger("pyannote").setLevel(logging.ERROR)
-logging.getLogger("lightning.pytorch").setLevel(logging.ERROR)
-logging.getLogger("lightning.pytorch.utilities.migration.utils").setLevel(logging.ERROR)
-
-warnings.filterwarnings("ignore", module="whisperx")
-warnings.filterwarnings("ignore", module="pyannote")
-warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
-
 from pathlib import Path
 from typing import Any, cast
+
+from config import Config
+
+Config.configure()
 
 import numpy as np
 import pandas as pd
@@ -28,8 +19,6 @@ import whisperx
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from whisperx.asr import FasterWhisperPipeline, TranscriptionResult
 from whisperx.diarize import DiarizationPipeline
-
-from config import Config
 
 
 def _format_elapsed_time(seconds: float) -> str:
