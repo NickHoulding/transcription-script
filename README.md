@@ -2,7 +2,7 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.11.9-blue.svg)
 ![WhisperX](https://img.shields.io/badge/WhisperX-3.8+-green.svg)
-![CUDA](https://img.shields.io/badge/CUDA-required-orange.svg)
+![Device](https://img.shields.io/badge/device-CPU%20%7C%20CUDA%20(auto--detected)-orange.svg)
 
 > Automated audio/video transcription with speaker diarization, powered by WhisperX and pyannote.audio
 
@@ -16,6 +16,7 @@
 - [Key Features](#key-features)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
+- [Configuration](#configuration)
 - [Usage](#usage)
 - [Output Format](#output-format)
 - [Architecture](#architecture)
@@ -67,8 +68,8 @@ Unlike simple transcription tools, this script preserves speaker context, making
 ### **Core Technologies**
 - **Python 3.11.9** - Modern Python with type hints and improved performance
 - **WhisperX 3.8+** - Enhanced Whisper implementation with alignment and diarization
-- **PyTorch** - Deep learning framework for model inference
-- **CUDA** - GPU acceleration for real-time processing
+- **PyTorch** - Deep learning framework for model inference; also used to auto-detect CUDA availability
+- **CUDA** - Optional GPU acceleration; auto-detected at startup, falls back to CPU when unavailable
 
 ### **Audio & Speech Processing**
 - **faster-whisper** - Optimized Whisper implementation using CTranslate2
@@ -78,11 +79,12 @@ Unlike simple transcription tools, this script preserves speaker context, making
 ### **Machine Learning Models**
 - **OpenAI Whisper** - Automatic speech recognition (multiple model sizes available)
   - Options: `tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v2`, `large-v3`, `turbo`
-- **pyannote/speaker-diarization-3.1** - State-of-the-art speaker segmentation
-- **pyannote/segmentation-3.0** - Voice activity detection
+- **pyannote/speaker-diarization-community-1** - Speaker diarization pipeline (segmentation, embedding, and clustering bundled together)
 
 ### **Utilities**
 - **python-dotenv** - Environment variable management
+- **questionary** - Interactive CLI prompts
+- **rich** - Spinner/progress output during pipeline stages
 - **NumPy** - Numerical operations for audio processing
 - **pandas** - Diarization result handling
 
@@ -92,11 +94,14 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 ### **Flexible Model Selection**
 - **7 Whisper model options** - Choose speed vs. accuracy tradeoff
-  - `tiny.en` - Fastest, lowest accuracy (~1GB VRAM)
-  - `medium.en` - Balanced performance (default, ~5GB VRAM)
-  - `turbo` - Latest model with improved speed (~6GB VRAM)
-- Interactive model selection at runtime
-- Automatic model downloading and caching
+  - `tiny.en` - Fastest, lowest accuracy
+  - `medium.en` - Balanced performance (default)
+  - `turbo` - Latest model with improved speed
+- Interactive model selection at runtime, with a configurable default
+
+### **Self-Contained Model Storage**
+- **Project-local model cache** - Whisper, alignment, and diarization models download into a top-level `models/` directory instead of your global Hugging Face/torch caches, so the project's model footprint stays self-contained and easy to locate or wipe
+- **Standard cache reuse** - Each library's own caching (Hugging Face Hub blobs/etags, `torch.hub`) is preserved, so models are only downloaded once
 
 ### **Speaker Diarization**
 - **Automatic speaker identification** - Distinguishes between different voices
@@ -108,7 +113,7 @@ Unlike simple transcription tools, this script preserves speaker context, making
 - **Multi-stage processing** - Transcription → alignment → diarization → speaker assignment
 - **Word-level timestamp alignment** - Precise timing information for each word
 - **Language detection** - Automatically detects spoken language for alignment
-- **Error handling** - Graceful failure with informative error messages
+- **Error handling** - Graceful failure with informative error messages, both printed to console and logged with a full traceback
 
 ### **Dual Output Formats**
 - **Human-readable TXT** - Speaker-labeled transcript for easy reading
@@ -117,14 +122,26 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 ### **Interactive CLI**
 - **Guided prompts** - Step-by-step input collection with validation
-- **Path validation** - Ensures input files and output directories exist
+- **Path validation** - Ensures input files and output directories exist; accepts relative and absolute paths
 - **Progress indicators** - Real-time feedback on pipeline stages
 - **Keyboard interrupt handling** - Clean exit with Ctrl+C
 
-### **GPU-Accelerated**
-- **CUDA support** - Leverages NVIDIA GPUs for 10-100x speedup vs CPU
-- **Configurable compute type** - float16 for speed, float32 for accuracy
-- **Batch processing** - Efficient inference with configurable batch sizes
+### **Structured Logging**
+- **One log file per run** - Written to a top-level `logs/` directory, timestamped by when the run started
+- **Automatic retention** - Old run logs beyond a configurable count are pruned automatically
+- **Console stays clean** - Logging runs alongside the existing console/spinner output rather than replacing it
+- **Independent log levels** - The application's own log level and the level used to suppress noisy third-party loggers are configured separately
+
+### **Centralized, Blank-Safe Configuration**
+- **Single source of truth** - All tunables live as static fields on `Config` in `config.py`, loaded from environment variables at import time
+- **Every variable is optional** - Every setting in `.env` can be left blank to fall back to its built-in default; The HuggingFace token is the only required field
+- **Auto-detected hardware settings** - `DEVICE` and `COMPUTE_TYPE` auto-detect sensible values (CUDA/float16 if a GPU is available, otherwise CPU/int8) unless explicitly overridden
+
+### **Hardware Acceleration**
+- **Auto-detected CUDA support** - Uses an NVIDIA GPU automatically when available for a large speedup over CPU
+- **CPU fallback** - Runs fully on CPU (with an int8 compute type) when no GPU is present, no configuration needed
+- **Configurable compute type** - Override the auto-detected precision (e.g. `float16`, `int8`, `float32`) via `COMPUTE_TYPE`
+- **Batch processing** - Efficient inference with a configurable batch size
 
 ---
 
@@ -132,16 +149,12 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 ### **Hardware Requirements**
 
-- **CUDA-capable NVIDIA GPU** (required)
-  - Minimum: 6GB VRAM (for `medium.en` model)
-  - Recommended: 8GB+ VRAM (for `large-v3` or `turbo` models)
-  - Tested on: RTX 40 series
-- **Disk Space**: 10-20GB for model downloads and cache
+- **CUDA-capable NVIDIA GPU** (optional, recommended) - `DEVICE` auto-detects and uses CUDA when available for a large speedup; the script runs fine on CPU with no configuration if no GPU is present
 
 ### **Software Requirements**
 
 - **Python 3.11.9** (exact version required due to dependencies)
-- **CUDA Toolkit 11.8+** or **12.x**
+- **CUDA Toolkit 11.8+ or 12.x** (only needed if using a GPU)
   - Download: https://developer.nvidia.com/cuda-downloads
   - Verify: `nvcc --version` or `nvidia-smi`
 - **ffmpeg** (for audio/video processing)
@@ -152,12 +165,10 @@ Unlike simple transcription tools, this script preserves speaker context, making
 ### **HuggingFace Account**
 
 - **HuggingFace token** (required for speaker diarization)
-  - Models used: `pyannote/speaker-diarization-3.1`, `pyannote/segmentation-3.0`
+  - Model used: `pyannote/speaker-diarization-community-1`
   - Create account: https://huggingface.co/join
   - Generate token: https://huggingface.co/settings/tokens (read access sufficient)
-  - Accept model agreements:
-    - https://huggingface.co/pyannote/speaker-diarization-3.1
-    - https://huggingface.co/pyannote/segmentation-3.0
+  - Accept the model agreement: https://huggingface.co/pyannote/speaker-diarization-community-1
 
 ---
 
@@ -193,8 +204,9 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 4. **Verify installation**
    ```bash
-   python transcribe.py --help
+   uv run python -c "import transcribe"
    ```
+   No output means everything imported successfully. `transcribe.py` is a purely interactive prompt-driven script (see [Usage](#usage)).
 
 #### **Method 2: Using `pip` (Alternative)**
 
@@ -215,10 +227,10 @@ If you encounter issues with `uv` on Windows or prefer traditional pip:
    # Option B: Virtual environment (recommended)
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install whisperx==3.8.2 python-dotenv black isort mypy torchcodec
+   pip install "whisperx>=3.8.2" dotenv questionary rich torchcodec black isort mypy
 
    # Option A: Global installation (not recommended, only if other options aren't working)
-   pip install whisperx==3.8.2 python-dotenv black isort mypy torchcodec
+   pip install "whisperx>=3.8.2" dotenv questionary rich torchcodec black isort mypy
    ```
 
 4. **Run the script**
@@ -228,17 +240,18 @@ If you encounter issues with `uv` on Windows or prefer traditional pip:
 
 ### **Environment Setup**
 
-1. **Create `.env` file in the project root**
+1. **Copy the example environment file**
    ```bash
-   touch .env  # On Windows: type nul > .env
+   cp .env.example .env
    ```
 
 2. **Add your HuggingFace token**
+
+   Open `.env` and set:
    ```env
-   HF_TOKEN=hf_your_token_here
+   HF_TOKEN=YOUR_HF_TOKEN_HERE
    ```
-   
-   Replace `hf_your_token_here` with your actual token from https://huggingface.co/settings/tokens
+   Replace `YOUR_HF_TOKEN_HERE` with your actual token from https://huggingface.co/settings/tokens. This is the only required variable. Every other variable in `.env.example` is optional and can be left blank to use its built-in default (see [Configuration](#configuration)).
 
 3. **Verify token is loaded**
    ```bash
@@ -247,11 +260,30 @@ If you encounter issues with `uv` on Windows or prefer traditional pip:
 
 ### **First Run**
 
-On first execution, the script will download the selected model to your cache directory:
-- **Whisper models**: `~/.cache/huggingface/hub/` (~1-3GB per model)
-- **Pyannote models**: `~/.cache/torch/pyannote/` (~200MB)
+On first execution, the script downloads the selected transcription model, the language-specific alignment model, and the diarization pipeline into a project-local `models/` directory. This is a one-time download per model. Subsequent runs reuse the cached files. See [Self-Contained Model Storage](#key-features) and the `MODEL_DIR` variable in [Configuration](#configuration) to change where models are cached.
 
-This is a one-time download. Subsequent runs will use cached models.
+---
+
+## Configuration
+
+All configuration lives in `config.py` as static fields on the `Config` class, loaded from environment variables at import time. Copy `.env.example` to `.env` and fill in `HF_TOKEN`. Every other variable is optional and falls back to the default below when left blank.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `HF_TOKEN` | **Yes** | - | Hugging Face API token, needed for diarization model access |
+| `DEVICE` | No | auto-detected (`cuda` if available, else `cpu`) | Inference device passed to WhisperX |
+| `COMPUTE_TYPE` | No | auto-detected (`float16` on `cuda`, `int8` on `cpu`) | Model precision passed to WhisperX |
+| `BATCH_SIZE` | No | `16` | Number of audio chunks processed per transcription batch |
+| `DEFAULT_MODEL` | No | `medium.en` | WhisperX model used when no selection is made. Choices: `tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v2`, `large-v3`, `turbo` |
+| `MODEL_DIR` | No | `models` (project root) | Top-level directory models are downloaded/cached into |
+| `THIRD_PARTY_LOG_LEVEL` | No | `ERROR` | Log level applied to noisy third-party loggers (WhisperX, pyannote, PyTorch Lightning), mainly used to suppress noise. Choices: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `WARNINGS_ENABLED` | No | `true` | Whether third-party warning filters are installed. Choices: `true`, `false` |
+| `WARNINGS_ACTION` | No | `ignore` | Action applied to filtered warnings. Choices: `default`, `error`, `ignore`, `always`, `module`, `once` |
+| `LOG_DIR` | No | `logs` (project root) | Top-level directory application log files are written to |
+| `LOG_LEVEL` | No | `INFO` | Log level for the application's own logger. Choices: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `LOG_RETENTION_COUNT` | No | `10` | Number of most-recent run log files kept in `LOG_DIR`; older ones are pruned automatically |
+
+`MODEL_DIR` and `LOG_DIR` are always resolved relative to the project root (the directory containing `config.py`), not the current working directory, so they land in the same place regardless of where you run the script from.
 
 ---
 
@@ -337,6 +369,8 @@ Transcribing (2m 15s)
 
 Total elapsed time (5m 23s)
 ```
+
+Each of these lines is also written to that run's log file under `logs/` (see [Configuration](#configuration)), alongside the run's parameters and, on failure, a full traceback.
 
 ### **Example Session**
 
@@ -503,7 +537,7 @@ WhisperX integrates three separate models (Whisper, alignment, diarization) into
 The script employs defensive programming:
 - **Pre-flight validation** - Checks file paths, HF token, speaker count before processing
 - **Stage-by-stage error catching** - Each pipeline stage wrapped in try/except
-- **Informative messages** - Errors indicate which stage failed and why
+- **Informative messages** - Errors indicate which stage failed and why, printed to console and logged with a full traceback to that run's log file
 - **Clean exits** - KeyboardInterrupt (Ctrl+C) exits gracefully without traceback
 - **No partial outputs** - Files only written if full pipeline succeeds
 
@@ -516,28 +550,27 @@ The script employs defensive programming:
 **Problem:** `RuntimeError: CUDA out of memory`
 - **Cause:** Selected model requires more VRAM than available
 - **Solution:** Choose a smaller model (`tiny.en`, `base.en`, `small.en`)
-- **Solution:** Reduce `BATCH_SIZE` in `transcribe.py` (default: 16)
+- **Solution:** Reduce `BATCH_SIZE` in `.env` (default: 16)
 - **Solution:** Close other GPU-using applications
 
-**Problem:** `torch.cuda.is_available()` returns `False`
-- **Cause:** PyTorch not built with CUDA support or CUDA drivers missing
+**Problem:** Script runs on CPU when you expected GPU (slow)
+- **Cause:** `torch.cuda.is_available()` returns `False`. PyTorch isn't built with CUDA support, or CUDA drivers are missing. `DEVICE` auto-detects this and falls back to `cpu`/`int8` automatically, so the script still runs, just slower.
 - **Solution:** Reinstall PyTorch with CUDA: `pip install torch --index-url https://download.pytorch.org/whl/cu118`
 - **Solution:** Update NVIDIA drivers: https://www.nvidia.com/Download/index.aspx
 - **Solution:** Verify CUDA installation: `nvidia-smi`
+- **Solution:** Once fixed, `DEVICE`/`COMPUTE_TYPE` will auto-detect CUDA again on the next run. No `.env` change needed unless you want to force one or the other explicitly
 
 ### **HuggingFace Token Issues**
 
 **Problem:** `RuntimeError: HF_TOKEN is not set`
 - **Cause:** `.env` file missing or token not set
-- **Solution:** Create `.env` file in project root with `HF_TOKEN=your_token_here`
+- **Solution:** Copy `.env.example` to `.env` and set `HF_TOKEN=YOUR_HF_TOKEN_HERE`
 - **Solution:** Verify token: `cat .env` (Linux/Mac) or `type .env` (Windows)
 
 **Problem:** `401 Client Error: Unauthorized for url: https://huggingface.co/...`
 - **Cause:** Invalid token or model access not granted
 - **Solution:** Regenerate token at https://huggingface.co/settings/tokens
-- **Solution:** Accept model agreements:
-  - https://huggingface.co/pyannote/speaker-diarization-3.1
-  - https://huggingface.co/pyannote/segmentation-3.0
+- **Solution:** Accept the model agreement: https://huggingface.co/pyannote/speaker-diarization-community-1
 
 ### **Windows-Specific Issues**
 
@@ -550,15 +583,10 @@ The script employs defensive programming:
 ### **Model Download Issues**
 
 **Problem:** Models download slowly or fail
-- **Cause:** Large model files (1-3GB) downloading over slow connection
+- **Cause:** Large model files downloading over slow connection
 - **Solution:** Be patient on first run (one-time download)
-- **Solution:** Check disk space: models cache to `~/.cache/huggingface/`
-- **Solution:** Manual download: Visit https://huggingface.co/models and download to cache dir
-
-**Problem:** "Model not found" errors
-- **Cause:** Model name typo or unsupported model
-- **Solution:** Use model selection menu (don't type model names manually)
-- **Solution:** Verify spelling in `TRANSCRIPTION_MODELS` list (lines 42-50)
+- **Solution:** Check disk space: models cache to the project-local `models/` directory (or wherever `MODEL_DIR` points)
+- **Solution:** Manual download: Visit https://huggingface.co/models and download into the `models/` directory
 
 ### **Audio Processing Issues**
 
