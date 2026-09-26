@@ -283,18 +283,18 @@ The script will guide you through 4 steps:
 
 #### **2. Provide Input File Path**
 ```
-❯ Enter path to input file (absolute): /home/user/recordings/interview_2024.mp3
+❯ Enter path to input file: /home/user/recordings/interview_2024.mp3
 ```
-- Provide the absolute path to your audio or video file
+- Provide the path (relative or absolute) to your audio or video file
 - Supported formats: `.mp3`, `.wav`, `.m4a`, `.mp4`, `.avi`, `.mov`, etc.
 - Tab completion is available for filesystem paths
 - File must exist or an inline error will prompt you to re-enter
 
 #### **3. Specify Output Directory**
 ```
-❯ Enter path to existing save directory (absolute): /home/user/transcripts/
+❯ Enter path to existing save directory: /home/user/transcripts/
 ```
-- Provide absolute path to an existing directory
+- Provide the path (relative or absolute) to an existing directory
 - Output files will be saved here with `_transcription.txt` and `_transcription.json` suffixes
 - Directory must exist before running
 
@@ -344,8 +344,8 @@ Total elapsed time (5m 23s)
 $ python transcribe.py
 
 ❯ Enter number of speakers: 2
-❯ Enter path to input file (absolute): /home/nick/media/interview_john_doe.mp3
-❯ Enter path to existing save directory (absolute): /home/nick/transcripts/
+❯ Enter path to input file: /home/nick/media/interview_john_doe.mp3
+❯ Enter path to existing save directory: /home/nick/transcripts/
 ❯ Select a model: medium.en
 Loading transcription model 'medium.en' (4.3s)
 Loading audio (0.8s)

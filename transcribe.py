@@ -3,6 +3,7 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
 import questionary
 
@@ -28,6 +29,7 @@ def validate_num_speakers(val: str) -> bool | str:
 def validate_file_path(file_path: str) -> bool | str:
     if not file_path:
         return "Path cannot be empty."
+    file_path = os.path.expanduser(file_path)
     if not os.path.exists(file_path):
         return "File does not exist."
     if not os.path.isfile(file_path):
@@ -38,6 +40,7 @@ def validate_file_path(file_path: str) -> bool | str:
 def validate_save_path(save_path: str) -> bool | str:
     if not save_path:
         return "Path cannot be empty."
+    save_path = os.path.expanduser(save_path)
     if not os.path.exists(save_path):
         return "Directory does not exist."
     if not os.path.isdir(save_path):
@@ -115,19 +118,31 @@ def main() -> None:
         ).unsafe_ask()
         num_speakers: int = int(num_speakers_input.strip())
 
-        file_path_input: str = questionary.path(
-            message="Enter path to input file (absolute):",
-            validate=validate_file_path,
-            qmark="❯",
-            style=Config.prompt_style,
-        ).unsafe_ask()
+        file_path_input: str = str(
+            Path(
+                questionary.path(
+                    message="Enter path to input file:",
+                    validate=validate_file_path,
+                    qmark="❯",
+                    style=Config.prompt_style,
+                ).unsafe_ask()
+            )
+            .expanduser()
+            .resolve()
+        )
 
-        save_path_input: str = questionary.path(
-            message="Enter path to existing save directory (absolute):",
-            validate=validate_save_path,
-            qmark="❯",
-            style=Config.prompt_style,
-        ).unsafe_ask()
+        save_path_input: str = str(
+            Path(
+                questionary.path(
+                    message="Enter path to existing save directory:",
+                    validate=validate_save_path,
+                    qmark="❯",
+                    style=Config.prompt_style,
+                ).unsafe_ask()
+            )
+            .expanduser()
+            .resolve()
+        )
 
         selected_model: str = select_transcription_model()
 

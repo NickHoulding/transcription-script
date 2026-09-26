@@ -88,8 +88,8 @@ class TranscriptionPipeline:
         """Initialise the pipeline with pre-validated run parameters.
 
         Args:
-            file_path: Absolute path to the input audio file.
-            save_path: Absolute path to the directory where output files are written.
+            file_path: Path to the input audio file.
+            save_path: Path to the directory where output files are written.
             num_speakers: Expected number of speakers in the audio.
             model: WhisperX model name to use for transcription.
         """
