@@ -151,7 +151,10 @@ class TranscriptionPipeline:
         with _spinner(f"Loading transcription model '{self._model}'"):
             try:
                 model: FasterWhisperPipeline = whisperx.load_model(
-                    self._model, device=Config.device, compute_type=Config.compute_type
+                    self._model,
+                    device=Config.device,
+                    compute_type=Config.compute_type,
+                    download_root=str(Config.model_dir),
                 )
             except Exception as e:
                 raise RuntimeError(
@@ -219,7 +222,9 @@ class TranscriptionPipeline:
         with _spinner("Loading alignment model"):
             try:
                 align_model, metadata = whisperx.load_align_model(
-                    language_code=transcription["language"], device=Config.device
+                    language_code=transcription["language"],
+                    device=Config.device,
+                    model_dir=str(Config.model_dir),
                 )
             except Exception as e:
                 raise RuntimeError(f"Failed to load alignment model: {e}") from e
@@ -252,7 +257,9 @@ class TranscriptionPipeline:
         with _spinner("Loading diarization model"):
             try:
                 diarize_model: DiarizationPipeline = DiarizationPipeline(
-                    token=Config.hf_token, device=Config.device
+                    token=Config.hf_token,
+                    device=Config.device,
+                    cache_dir=str(Config.model_dir),
                 )
             except Exception as e:
                 raise RuntimeError(f"Failed to load diarization model: {e}") from e

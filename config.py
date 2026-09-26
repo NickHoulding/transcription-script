@@ -8,6 +8,7 @@ from typing import Literal, cast
 from dotenv import load_dotenv
 from questionary import Style
 import logging
+import torch
 import warnings
 
 load_dotenv()
@@ -20,11 +21,12 @@ class Config:
 
     Attributes:
         hf_token: Hugging Face API token for diarization model access.
-        device: Inference device passed to WhisperX (e.g. ``"cuda"``, ``"cpu"``).
-        compute_type: Model precision (e.g. ``"float16"``, ``"int8"``).
+        device: Inference device passed to WhisperX; auto-detected unless ``DEVICE`` is set.
+        compute_type: Model precision; auto-detected by device unless ``COMPUTE_TYPE`` is set.
         batch_size: Number of audio chunks processed per transcription batch.
         default_model: WhisperX model used when the user makes no selection.
         transcription_models: Ordered list of available WhisperX model names.
+        model_dir: The root-directory-constrained path where models are downloaded/cached.
         third_party_log_level: Level applied to suppress noisy third-party loggers.
         warnings_enabled: Whether third-party warning filters are installed.
         warnings_action: Action passed to ``warnings.filterwarnings`` (e.g. ``"ignore"``).
@@ -44,6 +46,7 @@ class Config:
         Config._configure_app_logging()
         Config._configure_third_party_logging()
         Config._configure_warnings()
+        Config._configure_model_storage()
 
     # -------------------------------------------------------------------------
     # Hugging Face
@@ -55,8 +58,12 @@ class Config:
     # Device
     # -------------------------------------------------------------------------
 
-    device: str = os.getenv("DEVICE", "cuda")
-    compute_type: str = os.getenv("COMPUTE_TYPE", "float16")
+    device: str = os.getenv("DEVICE") or (
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
+    compute_type: str = os.getenv("COMPUTE_TYPE") or (
+        "float16" if device == "cuda" else "int8"
+    )
     batch_size: int = int(os.getenv("BATCH_SIZE", "16"))
 
     # -------------------------------------------------------------------------
@@ -73,6 +80,12 @@ class Config:
         "large-v3",
         "turbo",
     ]
+    model_dir: Path = _PROJECT_ROOT / os.getenv("MODEL_DIR", "models")
+
+    @staticmethod
+    def _configure_model_storage() -> None:
+        """Ensure ``Config.model_dir`` exists so models download/cache into the project."""
+        Config.model_dir.mkdir(parents=True, exist_ok=True)
 
     # -------------------------------------------------------------------------
     # Application logging
