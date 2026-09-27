@@ -15,10 +15,20 @@ dependencies = [
     "whisperx>=3.8.2",
 ]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/transcription_script"]
+
+[project.scripts]
+transcribe = "transcription_script.transcribe:main"
+
 [tool.isort]
 profile = "black"
 line_length = 88
-known_first_party = "transcription-script"
+known_first_party = "transcription_script"
 
 [tool.black]
 line-length = 88
@@ -39,3 +49,4 @@ exclude = '''
 python_version = 3.11
 strict = true
 disable_error_code = ["import-untyped"]
+files = ["src"]

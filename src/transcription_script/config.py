@@ -13,7 +13,7 @@ import warnings
 
 load_dotenv()
 
-_PROJECT_ROOT: Path = Path(__file__).resolve().parent
+_PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
 
 
 class Config:

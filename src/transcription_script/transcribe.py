@@ -7,8 +7,8 @@ from pathlib import Path
 
 import questionary
 
-from config import Config
-from pipeline import TranscriptionPipeline
+from .config import Config
+from .pipeline import TranscriptionPipeline
 
 logger = logging.getLogger(__name__)
 

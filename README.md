@@ -204,9 +204,9 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 4. **Verify installation**
    ```bash
-   uv run python -c "import transcribe"
+   uv run python -c "import transcription_script"
    ```
-   No output means everything imported successfully. `transcribe.py` is a purely interactive prompt-driven script (see [Usage](#usage)).
+   No output means everything imported successfully. This is a purely interactive prompt-driven script (see [Usage](#usage)).
 
 #### **Method 2: Using `pip` (Alternative)**
 
@@ -222,20 +222,21 @@ If you encounter issues with `uv` on Windows or prefer traditional pip:
    cd transcription-script
    ```
 
-3. **Install dependencies globally or in a venv**
+3. **Install the project (editable), globally or in a venv**
    ```bash
    # Option B: Virtual environment (recommended)
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install "whisperx>=3.8.2" dotenv questionary rich torchcodec black isort mypy
+   pip install -e .
 
    # Option A: Global installation (not recommended, only if other options aren't working)
-   pip install "whisperx>=3.8.2" dotenv questionary rich torchcodec black isort mypy
+   pip install -e .
    ```
+   `-e .` installs this project itself (not just its dependencies), which is what registers the `transcribe` console script and makes the `transcription_script` package importable.
 
 4. **Run the script**
    ```bash
-   python transcribe.py  # Or: python3 transcribe.py
+   transcribe  # Or: python -m transcription_script
    ```
 
 ### **Environment Setup**
@@ -282,7 +283,7 @@ All configuration lives in `config.py` as static fields on the `Config` class, l
 | `LOG_LEVEL` | No | `INFO` | Log level for the application's own logger. Choices: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `LOG_RETENTION_COUNT` | No | `10` | Number of most-recent run log files kept in `LOG_DIR`; older ones are pruned automatically |
 
-`MODEL_DIR` and `LOG_DIR` are always resolved relative to the project root (the directory containing `config.py`), not the current working directory, so they land in the same place regardless of where you run the script from.
+`MODEL_DIR` and `LOG_DIR` are always resolved relative to the project root, not the current working directory, so they land in the same place regardless of where you run the script from.
 
 ---
 
@@ -294,10 +295,12 @@ Start the interactive transcription pipeline:
 
 ```bash
 # If using uv:
-uv run transcribe.py
+uv run transcribe
+# Or: uv run python -m transcription_script
 
 # If using pip/global install:
-python transcribe.py
+transcribe
+# Or: python -m transcription_script
 ```
 
 ### **Interactive Prompts**
@@ -373,7 +376,7 @@ Each of these lines is also written to that run's log file under `logs/` (see [C
 ### **Example Session**
 
 ```bash
-$ python transcribe.py
+$ uv run transcribe
 
 ❯ Enter number of speakers: 2
 ❯ Enter path to input file: /home/nick/media/interview_john_doe.mp3

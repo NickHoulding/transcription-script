@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, cast
 
-from config import Config
+from .config import Config
 
 Config.configure()
 
