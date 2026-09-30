@@ -1,19 +1,71 @@
 """Centralized configuration loaded from environment variables."""
 
 import os
-from datetime import datetime
+import socket
 from pathlib import Path
-from typing import Literal, cast
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
+_PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
+
+
+def _is_online(
+    host: str = "huggingface.co", port: int = 443, timeout: float = 1.5
+) -> bool:
+    """Check for internet connectivity via a short-timeout TCP connect."""
+    try:
+        socket.create_connection((host, port), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
+_ONLINE: bool = _is_online()
+
+if not _ONLINE:
+    """huggingface_hub (used by faster-whisper and pyannote.audio) reads HF_HUB_OFFLINE once at import time, so this must be set before it's imported anywhere below. Otherwise every model load attempts a real network request first, hangs on DNS resolution/retries, and only falls back to the local cache after a long timeout."""
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
+from datetime import datetime
+from typing import Literal, cast
+
+from faster_whisper.utils import available_models, download_model
+from huggingface_hub.errors import LocalEntryNotFoundError
 from questionary import Style
 import logging
 import torch
 import warnings
 
-load_dotenv()
 
-_PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
+def _is_model_cached(model: str, model_dir: Path) -> bool:
+    """Check whether ``model`` is already downloaded into ``model_dir``."""
+    try:
+        download_model(model, local_files_only=True, cache_dir=str(model_dir))
+        return True
+    except LocalEntryNotFoundError:
+        return False
+
+
+def _resolve_transcription_models(model_dir: Path) -> tuple[list[str], set[str]]:
+    """List available WhisperX models, and which of them are already cached.
+
+    Returns:
+        A tuple of (model names, cached model names). When offline, the model
+        list is constrained to only cached models (so the second set then
+        equals the first list).
+    """
+    available: list[str] = available_models()
+
+    if not _ONLINE:
+        cached_only = [
+            model for model in available if _is_model_cached(model, model_dir)
+        ]
+        return cached_only, set(cached_only)
+
+    cached = {model for model in available if _is_model_cached(model, model_dir)}
+    return available, cached
 
 
 class Config:
@@ -24,8 +76,10 @@ class Config:
         device: Inference device passed to WhisperX; auto-detected unless ``DEVICE`` is set.
         compute_type: Model precision; auto-detected by device unless ``COMPUTE_TYPE`` is set.
         batch_size: Number of audio chunks processed per transcription batch.
-        transcription_models: Ordered list of available WhisperX model names.
         model_dir: The root-directory-constrained path where models are downloaded/cached.
+        transcription_models: Available WhisperX model names, resolved from faster-whisper. Constrained to already-cached models when offline.
+        cached_transcription_models: Subset of ``transcription_models`` already downloaded.
+        is_online: Whether internet connectivity was detected at import time.
         default_formats: Output formats pre-checked in the format selection prompt.
         third_party_log_level: Level applied to suppress noisy third-party loggers.
         warnings_enabled: Whether third-party warning filters are installed.
@@ -70,16 +124,11 @@ class Config:
     # WhisperX model
     # -------------------------------------------------------------------------
 
-    transcription_models: list[str] = [
-        "tiny.en",
-        "base.en",
-        "small.en",
-        "medium.en",
-        "large-v2",
-        "large-v3",
-        "turbo",
-    ]
     model_dir: Path = _PROJECT_ROOT / (os.getenv("MODEL_DIR") or "models")
+    transcription_models, cached_transcription_models = _resolve_transcription_models(
+        model_dir
+    )
+    is_online: bool = _ONLINE
 
     @staticmethod
     def _configure_model_storage() -> None:

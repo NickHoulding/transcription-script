@@ -78,7 +78,8 @@ Unlike simple transcription tools, this script preserves speaker context, making
 
 ### **Machine Learning Models**
 - **OpenAI Whisper** - Automatic speech recognition (multiple model sizes available)
-  - Options: `tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v2`, `large-v3`, `turbo`
+  - Options are resolved dynamically from the installed `faster-whisper` version (`faster_whisper.utils.available_models()`); includes `tiny`/`tiny.en`, `base`/`base.en`, `small`/`small.en`, `medium`/`medium.en`, `large-v1`/`v2`/`v3`, `turbo`, and several `distil-*` variants
+  - When offline, the list is narrowed to models already present in the local cache (checked via `faster_whisper.utils.download_model(..., local_files_only=True)`)
 - **pyannote/speaker-diarization-community-1** - Speaker diarization pipeline (segmentation, embedding, and clustering bundled together)
 
 ### **Utilities**
@@ -93,10 +94,11 @@ Unlike simple transcription tools, this script preserves speaker context, making
 ## Key Features
 
 ### **Flexible Model Selection**
-- **7 Whisper model options** - Choose speed vs. accuracy tradeoff
+- **Dynamically resolved model list** - Options come from the installed `faster-whisper` version, not a hardcoded list, so new models it adds show up automatically
   - `tiny.en` - Fastest, lowest accuracy
-  - `medium.en` - Balanced performance (default)
+  - `medium.en` - Balanced performance
   - `turbo` - Latest model with improved speed
+- **Offline-aware** - If there's no internet connection, the model list is automatically narrowed to only what's already downloaded into `models/`, and `HF_HUB_OFFLINE` is set so every model-loading step (transcription, alignment, diarization) reads straight from the local cache instead of stalling on network retries
 - Interactive model selection at runtime
 
 ### **Self-Contained Model Storage**
@@ -588,6 +590,10 @@ The script employs defensive programming:
 - **Solution:** Be patient on first run (one-time download)
 - **Solution:** Check disk space: models cache to the project-local `models/` directory (or wherever `MODEL_DIR` points)
 - **Solution:** Manual download: Visit https://huggingface.co/models and download into the `models/` directory
+
+**Problem:** Fewer models show up in the selection prompt than expected
+- **Cause:** No internet connection was detected at startup, so the list was narrowed to only models already cached in `models/` (see [Flexible Model Selection](#key-features))
+- **Solution:** Reconnect to the internet and restart the script to see the full list again
 
 ### **Audio Processing Issues**
 

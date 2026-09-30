@@ -48,6 +48,12 @@ def validate_save_path(save_path: str) -> bool | str:
     return True
 
 
+def validate_selected_formats(formats: list[str]) -> bool | str:
+    if not formats:
+        return "At least one output format must be selected."
+    return True
+
+
 def validate_hf_token() -> None:
     """Ensure HF_TOKEN is set; raise RuntimeError if it is empty.
 
@@ -60,6 +66,20 @@ def validate_hf_token() -> None:
         )
 
 
+def validate_transcription_models_available() -> None:
+    """Ensure at least one transcription model is selectable; raise RuntimeError otherwise.
+
+    Raises:
+        RuntimeError: If no internet connection was detected and no models are cached locally.
+    """
+    if not Config.transcription_models:
+        raise RuntimeError(
+            "No transcription models are available offline and no internet connection "
+            f"was detected. Connect to the internet, or download a model into "
+            f"'{Config.model_dir}' first."
+        )
+
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -69,6 +89,7 @@ def main() -> None:
     """Gather inputs and hand off to the transcription pipeline."""
     try:
         validate_hf_token()
+        validate_transcription_models_available()
     except RuntimeError as e:
         logger.error("Configuration error: %s", e, exc_info=True)
         print(f"[ERROR] Configuration error: {e}")
@@ -109,16 +130,34 @@ def main() -> None:
             .resolve()
         )
 
+        if not Config.is_online:
+            logger.info("Network unavailable. Listing locally cached models.")
+            print("[!] Network unavailable. Listing locally cached models.")
+
         selected_model: str = questionary.select(
             message="Select a model:",
-            choices=Config.transcription_models,
+            instruction="(move: arrow keys, submit: enter)",
+            choices=[
+                questionary.Choice(
+                    title=(
+                        f"{model} (cached)"
+                        if Config.is_online
+                        and model in Config.cached_transcription_models
+                        else model
+                    ),
+                    value=model,
+                )
+                for model in Config.transcription_models
+            ],
             qmark="❯",
             pointer="❯",
             style=Config.prompt_style,
         ).unsafe_ask()
 
         selected_formats: list[str] = questionary.checkbox(
-            message="Select desired output format(s)",
+            message="Select desired output format(s):",
+            instruction="(move: arrow keys, toggle: space, submit: enter)",
+            validate=validate_selected_formats,
             choices=[
                 questionary.Choice(fmt, checked=fmt in Config.default_formats)
                 for fmt in TranscriptionPipeline.available_formats()
