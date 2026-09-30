@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, cast
 
-from .config import Config
+from transcription_script.config import Config
 
 Config.configure()
 

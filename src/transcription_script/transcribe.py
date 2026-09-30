@@ -6,9 +6,9 @@ from pathlib import Path
 
 import questionary
 
-from .config import Config
-from .pipeline import TranscriptionPipeline
-from .validate import (
+from transcription_script.config import Config
+from transcription_script.pipeline import TranscriptionPipeline
+from transcription_script.validate import (
     validate_hf_token,
     validate_num_speakers,
     validate_file_path,

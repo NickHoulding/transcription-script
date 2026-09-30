@@ -1,7 +1,7 @@
 """Validation methods for the transcription script"""
 
 import os
-from .config import Config
+from transcription_script.config import Config
 
 # =============================================================================
 # Runtime validation
